@@ -31,7 +31,9 @@ _Last updated: 2026-03-04_
 - `mindepth` bug in session mapping workflow: was `mindepth 2`, fixed to `mindepth 3` (2026-03-04, issue #3)
 
 ## Stale issue housekeeping
-- Heartbeat step 3: auto-closes unlabeled issues >14 days old + `crunch/done` labeled issues
+- Heartbeat step 3: auto-closes unlabeled issues >14 days old
+- `crunch/review` = in review by Marcus or Crunch — heartbeat asks for close after 7 days idle (no auto-close)
+- `crunch/done` label DEPRECATED — replaced by `crunch/review`
 
 ## Azure AI Foundry
 

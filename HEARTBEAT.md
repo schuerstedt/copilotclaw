@@ -95,13 +95,13 @@ gh issue list --repo schuerstedt/copilotclaw --state open --limit 50 \
     done
 ```
 
-Issues labeled `crunch/done`:
+Issues labeled `crunch/review` that have been sitting for 7+ days — don't auto-close, just ask:
 ```bash
-gh issue list --repo schuerstedt/copilotclaw --state open --label "crunch/done" --json number \
-  | jq -r '.[].number' \
-  | while read -r n; do
-      gh issue close "$n" --repo schuerstedt/copilotclaw \
-        --comment "🦃 crunch/done — closing. 👋"
+gh issue list --repo schuerstedt/copilotclaw --state open --label "crunch/review" --json number,title,updatedAt \
+  | jq -r '.[] | select(.updatedAt < (now - 604800 | todate)) | "\(.number) \(.title)"' \
+  | while read -r n title; do
+      gh issue comment "$n" --repo schuerstedt/copilotclaw \
+        --comment "🦃 This has been in \`crunch/review\` for 7+ days. Still in progress, or ready to close?"
     done
 ```
 
