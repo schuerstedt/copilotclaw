@@ -1,0 +1,54 @@
+name: Crunch Heartbeat
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # every 30 minutes
+  workflow_dispatch:          # also manually triggerable
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Copilot CLI
+        run: npm install -g @github/copilot
+
+      - name: Run heartbeat
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          BILLING_PAT: ${{ secrets.COPILOT_PAT }}
+          COPILOT_ALLOW_ALL: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Configure git
+          git config user.name "gitclaw[bot]"
+          git config user.email "gitclaw[bot]@users.noreply.github.com"
+
+          PROMPT="Heartbeat triggered. Read HEARTBEAT.md and run the checklist. Keep it short — update issue #10 with a diary entry and handle anything obvious. Don't overthink it."
+
+          mkdir -p state/copilot
+          touch /tmp/copilot-run-start
+          AGENT_TEXT=$(XDG_STATE_HOME=./state/copilot copilot --allow-all -s -p "$PROMPT" 2>/dev/null)
+
+          # Commit any state changes
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "gitclaw: heartbeat $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          fi
+          for i in 1 2 3; do
+            if git push origin main; then break; fi
+            git pull --rebase origin main || { git rebase --abort; break; }
+          done
+
+          # Post diary entry to issue #10
+          printf '%s' "$AGENT_TEXT" | head -c 60000 > /tmp/heartbeat-response.txt
+          gh issue comment 10 --body-file /tmp/heartbeat-response.txt
