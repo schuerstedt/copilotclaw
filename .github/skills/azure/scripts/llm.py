@@ -145,7 +145,13 @@ def main():
                         help="Print raw JSON response object")
     parser.add_argument("--no-fallback", action="store_true", dest="no_fallback",
                         help="Disable Azure model fallback")
+    parser.add_argument("--log-usage", dest="log_usage", default=None,
+                        help="Append JSON usage line to this file (or set AZURE_CALL_LOG env var)")
     args = parser.parse_args()
+
+    # Allow env var as default for log path
+    if args.log_usage is None:
+        args.log_usage = os.environ.get("AZURE_CALL_LOG")
 
     azure_endpoint = os.environ.get("AZURE_ENDPOINT", "").rstrip("/")
     azure_key = os.environ.get("AZURE_APIKEY", "")
@@ -188,6 +194,22 @@ def main():
     if response is None:
         print("ERROR: No response received.", file=sys.stderr)
         sys.exit(1)
+
+    # Log usage if requested
+    if args.log_usage and hasattr(response, "usage") and response.usage:
+        import datetime
+        usage_entry = {
+            "model": used_model,
+            "prompt_tokens": response.usage.prompt_tokens or 0,
+            "completion_tokens": response.usage.completion_tokens or 0,
+            "total_tokens": response.usage.total_tokens or 0,
+            "ts": datetime.datetime.utcnow().isoformat(),
+        }
+        try:
+            with open(args.log_usage, "a") as f:
+                f.write(json.dumps(usage_entry) + "\n")
+        except Exception:
+            pass  # never fail on logging
 
     if args.output_json:
         print(response.model_dump_json(indent=2))
