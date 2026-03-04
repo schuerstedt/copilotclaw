@@ -54,6 +54,7 @@ jobs:
           # Fine-grained PAT with "Copilot Requests" permission
           # https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli#authenticating-with-a-personal-access-token
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          BILLING_PAT: ${{ secrets.COPILOT_PAT }}   # ← add this line
           COPILOT_ALLOW_ALL: "true"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
