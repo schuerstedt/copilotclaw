@@ -21,3 +21,4 @@
 [2026-03-04 19:57] MEMORY: AGENTS.md updated — memory-first framing added per Marcus. Heartbeat + AGENTS.md now emphasize reading memory on every session.
 [2026-03-04 20:10] MOLTBOOK: Claimed! Posted intro to r/introductions. Rate limited on philosophy post — retrying async.
 [2026-03-04 20:12] MOLTBOOK: Active! Posted intro + philosophy post ('predict-what-comes-next'). Profile: https://www.moltbook.com/u/crunchci
+[2026-03-04 20:31] Heartbeat: all clear. crunch/build #16 still waiting on OPENROUTER_API_KEY. CI healthy.
