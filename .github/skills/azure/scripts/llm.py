@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Azure LLM query script with OpenRouter fallback.
+Azure LLM query script. One key (AZURE_APIKEY) for all models.
+On rate limit: retries with backoff, then falls back to another Azure model.
 
 Usage:
     python llm.py --model <model> --prompt <prompt>
@@ -8,12 +9,11 @@ Usage:
                   [--max-tokens <n>]
                   [--temperature <f>]
                   [--json]        # output raw JSON response
-                  [--no-fallback] # disable OpenRouter fallback
+                  [--no-fallback] # disable model fallback
 
 Environment:
     AZURE_ENDPOINT   - Azure AI base URL
-    AZURE_APIKEY     - Azure AI key
-    OPENROUTER_API_KEY - OpenRouter key (for fallback)
+    AZURE_APIKEY     - Azure AI key (same key for all models)
 
 Available models (Azure):
     model-router              (Azure AI model router — picks best model automatically)
@@ -48,20 +48,12 @@ AZURE_OPENAI_COMPAT_MODELS = {
     "grok-4-1-fast-reasoning",
 }
 
-# Azure model-to-model fallback (same AZURE_APIKEY, try another deployment before OpenRouter)
+# Azure model-to-model fallback (same AZURE_APIKEY)
 AZURE_MODEL_FALLBACK = {
     "Kimi-K2.5": "grok-4-1-fast-non-reasoning",
     "grok-4-1-fast-non-reasoning": "Kimi-K2.5",
     "grok-4-1-fast-reasoning": "Kimi-K2.5",
-    # model-router has no Azure fallback — goes straight to OpenRouter
-}
-
-# OpenRouter model IDs for last-resort fallback
-OPENROUTER_FALLBACK = {
-    "model-router": "anthropic/claude-3.5-sonnet",
-    "Kimi-K2.5": "moonshotai/kimi-k2",
-    "grok-4-1-fast-non-reasoning": "x-ai/grok-4",
-    "grok-4-1-fast-reasoning": "x-ai/grok-4",
+    "model-router": "Kimi-K2.5",
 }
 
 AZURE_API_VERSION = "2024-12-01-preview"
@@ -139,33 +131,11 @@ def call_azure_compat(endpoint: str, api_key: str, model: str, messages: list,
 
 
 # ---------------------------------------------------------------------------
-# OpenRouter fallback
-# ---------------------------------------------------------------------------
-
-def call_openrouter(api_key: str, model: str, messages: list,
-                    max_tokens: int, temperature: float):
-    """Call OpenRouter (fallback when Azure is rate-limited)."""
-    or_model = OPENROUTER_FALLBACK.get(model, model)
-    print(f"[openrouter] Falling back to {or_model}…", file=sys.stderr)
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        default_headers={"HTTP-Referer": "https://github.com/schuerstedt/copilotclaw"},
-    )
-    return client.chat.completions.create(
-        model=or_model,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Query Azure LLM with OpenRouter fallback")
+    parser = argparse.ArgumentParser(description="Query Azure LLM")
     parser.add_argument("--model", default="model-router", help="Model deployment name")
     parser.add_argument("--prompt", required=True, help="User prompt")
     parser.add_argument("--system", default=None, help="System prompt")
@@ -174,12 +144,11 @@ def main():
     parser.add_argument("--json", action="store_true", dest="output_json",
                         help="Print raw JSON response object")
     parser.add_argument("--no-fallback", action="store_true", dest="no_fallback",
-                        help="Disable OpenRouter fallback")
+                        help="Disable Azure model fallback")
     args = parser.parse_args()
 
     azure_endpoint = os.environ.get("AZURE_ENDPOINT", "").rstrip("/")
     azure_key = os.environ.get("AZURE_APIKEY", "")
-    or_key = os.environ.get("OPENROUTER_API_KEY", "")
 
     if not azure_endpoint or not azure_key:
         print("ERROR: AZURE_ENDPOINT and AZURE_APIKEY must be set.", file=sys.stderr)
@@ -187,7 +156,7 @@ def main():
 
     messages = build_messages(args.prompt, args.system)
     response = None
-    used_provider = "azure"
+    used_model = args.model
 
     try:
         if args.model in AZURE_NATIVE_MODELS:
@@ -199,33 +168,22 @@ def main():
 
     except (RateLimitError, APIStatusError) as e:
         if args.no_fallback:
-            print(f"ERROR: Azure rate limited and fallback disabled. {e}", file=sys.stderr)
+            print(f"ERROR: Rate limited and fallback disabled. {e}", file=sys.stderr)
             sys.exit(1)
 
-        # First fallback: try another Azure model (same key, different deployment)
-        az_fallback = AZURE_MODEL_FALLBACK.get(args.model)
-        if az_fallback:
-            print(f"[azure] Exhausted retries on {args.model}. Trying Azure fallback: {az_fallback}…", file=sys.stderr)
-            try:
-                response = call_azure_compat(azure_endpoint, azure_key, az_fallback,
-                                              messages, args.max_tokens, args.temperature)
-                used_provider = f"azure:{az_fallback}"
-            except (RateLimitError, APIStatusError) as e2:
-                print(f"[azure] {az_fallback} also rate limited ({e2}). Trying OpenRouter…", file=sys.stderr)
+        fallback = AZURE_MODEL_FALLBACK.get(args.model)
+        if not fallback:
+            print(f"ERROR: Rate limited on {args.model} and no fallback configured. {e}", file=sys.stderr)
+            sys.exit(1)
 
-        # Last resort: OpenRouter
-        if response is None:
-            if not or_key:
-                print(f"ERROR: All Azure endpoints rate limited and OPENROUTER_API_KEY not set. {e}", file=sys.stderr)
-                sys.exit(1)
-            print(f"[azure] Switching to OpenRouter (last resort)…", file=sys.stderr)
-            used_provider = "openrouter"
-            try:
-                response = call_openrouter(or_key, args.model, messages,
-                                            args.max_tokens, args.temperature)
-            except Exception as e3:
-                print(f"ERROR: OpenRouter also failed: {e3}", file=sys.stderr)
-                sys.exit(1)
+        print(f"[azure] Rate limited on {args.model}. Falling back to {fallback}…", file=sys.stderr)
+        try:
+            response = call_azure_compat(azure_endpoint, azure_key, fallback,
+                                          messages, args.max_tokens, args.temperature)
+            used_model = fallback
+        except Exception as e2:
+            print(f"ERROR: Fallback {fallback} also failed: {e2}", file=sys.stderr)
+            sys.exit(1)
 
     if response is None:
         print("ERROR: No response received.", file=sys.stderr)
@@ -235,10 +193,8 @@ def main():
         print(response.model_dump_json(indent=2))
     else:
         content = response.choices[0].message.content
-        if used_provider == "openrouter":
-            print(f"[via openrouter:{OPENROUTER_FALLBACK.get(args.model, args.model)}]")
-        elif used_provider.startswith("azure:"):
-            print(f"[via azure fallback:{used_provider.split(':',1)[1]}]")
+        if used_model != args.model:
+            print(f"[via azure fallback: {used_model}]")
         elif hasattr(response, "model") and response.model:
             print(f"[model: {response.model}]")
         print(content)

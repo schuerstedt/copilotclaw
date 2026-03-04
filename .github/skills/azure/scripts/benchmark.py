@@ -36,7 +36,7 @@ MODELS = [
     "grok-4-1-fast-reasoning",
 ]
 
-JUDGE_MODEL = "model-router"  # Azure picks the smartest available model to judge
+JUDGE_MODEL = "grok-4-1-fast-non-reasoning"  # fastest, most reliable; model-router requires different endpoint
 AZURE_API_VERSION = "2024-12-01-preview"
 MAX_RETRIES = 3
 BASE_BACKOFF = 8
@@ -127,9 +127,13 @@ def _retry(fn):
 
 def call_azure_compat(endpoint, key, model, messages, max_tokens=1024):
     client = OpenAI(base_url=endpoint, api_key=key)
-    return _retry(lambda: client.chat.completions.create(
+    resp = _retry(lambda: client.chat.completions.create(
         model=model, messages=messages, max_tokens=max_tokens, temperature=0.7,
     ))
+    # Some models return None content — normalise to empty string
+    if resp and resp.choices and resp.choices[0].message.content is None:
+        resp.choices[0].message.content = ""
+    return resp
 
 
 def call_azure_native(endpoint, key, model, messages, max_tokens=1024):
@@ -158,9 +162,8 @@ def judge_answer(endpoint, key, test, model_answer):
     msgs = [{"role": "system", "content": JUDGE_SYSTEM},
             {"role": "user", "content": prompt}]
     try:
-        resp = call_azure_native(endpoint, key, JUDGE_MODEL, msgs, max_tokens=200)
-        raw = resp.choices[0].message.content.strip()
-        # Strip markdown fences if judge gets sloppy
+        resp = call_azure_compat(endpoint, key, JUDGE_MODEL, msgs, max_tokens=200)
+        raw = (resp.choices[0].message.content or "").strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -183,7 +186,7 @@ def main():
 
     print(f"\n🦃 Crunch's LLM Benchmark — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"   Models: {', '.join(MODELS)}")
-    print(f"   Judge:  {JUDGE_MODEL} (model-router)")
+    print(f"   Judge:  {JUDGE_MODEL}")
     print(f"   Tests:  {len(TESTS)}\n")
     print("=" * 70)
 
@@ -214,7 +217,7 @@ def main():
 
     # --- Judge all answers ---
     print("\n\n" + "=" * 70)
-    print("⚖️  JUDGING (model-router scoring each answer 0-10)…")
+    print(f"⚖️  JUDGING ({JUDGE_MODEL} scoring each answer 0-10)…")
     print("=" * 70)
 
     for test in TESTS:
