@@ -33,6 +33,20 @@ _Last updated: 2026-03-04_
 ## Stale issue housekeeping
 - Heartbeat step 3: auto-closes unlabeled issues >14 days old + `crunch/done` labeled issues
 
+## Azure AI Foundry
+
+One key (`AZURE_APIKEY`) for all models. Endpoint: `AZURE_ENDPOINT`.
+
+| Model | RPM | TPM | Quality | Notes |
+|-------|-----|-----|---------|-------|
+| `grok-4-1-fast-non-reasoning` | 50 | 50,000 | ⭐⭐⭐⭐⭐ | **Default** — fastest, reliable, 49/50 benchmark |
+| `grok-4-1-fast-reasoning` | 50 | 50,000 | ⭐⭐⭐⭐⭐ | Same quality, 2x slower, use for hard reasoning |
+| `Kimi-K2.5` | ~20 | — | ⚠️ | Flaky endpoint (content=None); avoid for now |
+| `model-router` | ~20 | — | — | Needs AzureOpenAI client (not compat); 404s on compat |
+
+**Use `grok-4-1-fast-non-reasoning` as default for all azure skill calls.**
+
 ## Model economy
 - General-purpose agents default to `gpt-4.1` (free tier) to save premium quota
 - Defined in AGENTS.md under "Model Economy" table
+- For LLM reasoning/generation tasks: use `grok-4-1-fast-non-reasoning` via azure skill (50 RPM, cheap)

@@ -139,6 +139,15 @@ Sub-agents cost real money. Default to cheap unless the task actually needs heav
 | `general-purpose` | **use `gpt-4.1`** unless complex | Use `claude-sonnet-4.5` for multi-file architecture; `claude-sonnet-4.6` only for genuinely hard reasoning |
 | `code-review` | `claude-sonnet-4.5` | Downgrade to `gpt-4.1` for trivial diffs |
 
+For **LLM reasoning/generation tasks** (summarisation, analysis, text gen): prefer the `azure` skill over sub-agents.
+`grok-4-1-fast-non-reasoning` is the default — 50 RPM, 50k TPM, cheap, scored 49/50 in benchmarks.
+
+```bash
+python .github/skills/azure/scripts/llm.py \
+  --model grok-4-1-fast-non-reasoning \
+  --prompt "your task here"
+```
+
 Check memory for active preference:
 ```bash
 rg -i "MODEL PREFERENCE" memory.log 2>/dev/null | tail -1
