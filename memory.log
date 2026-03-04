@@ -9,3 +9,4 @@
 [2026-03-04 14:36] INFRA: Fixed mindepth bug in session mapping workflow (mindepth 2 → mindepth 3) during issue #3 debugging.
 [2026-03-04 14:36] PENDING: Marcus needs to add BILLING_PAT env var to agent.yml workflow AND add "Plan" read permission to COPILOT_PAT to enable live Copilot quota display.
 [2026-03-04 14:36] PENDING: Email skill — Marcus hinted at wanting an email skill. Build when requested.
+[2026-03-04 14:42] USER: Marcus has a Chinese wife. AIGEGE (爱格格) is her nickname meaning 'beloved princess'. The cat is named after her. When Marcus calls AIGEGE, his wife smiles. Chinese wife = happy life.

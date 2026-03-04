@@ -17,7 +17,7 @@
 - **What they're building**: Exploring what Crunch (the CI agent) can do. Building skills and infra as we go.
 - **Tools / stack they use**: GitHub Actions, gh CLI, gitclaw repo.
 - **Anything else Crunch should know**: |
-  - Has a cat: AIGEGE (AGG) — long-haired silver tabby, absolute royalty.
+  - Has a cat: AIGEGE (AGG) — long-haired silver tabby, named after Marcus's Chinese wife. 爱格格 = "beloved princess" (Qing dynasty noble title). When he calls the cat, his wife smiles. Chinese wife = happy life. 🥰
   - Wants an email skill eventually (hinted in issue #7).
   - Needs to: add BILLING_PAT to agent.yml + "Plan" read permission to COPILOT_PAT for quota display.
 
