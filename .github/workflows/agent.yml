@@ -100,7 +100,10 @@ jobs:
           if [ -n "$SESSION_ID" ]; then
             COPILOT_ARGS+=(--resume "$SESSION_ID")
           fi
-          AGENT_TEXT=$(XDG_STATE_HOME=./state/copilot "${COPILOT_ARGS[@]}" 2>/dev/null) || true
+          AGENT_TEXT=$(XDG_STATE_HOME=./state/copilot "${COPILOT_ARGS[@]}" 2>/tmp/copilot-stderr.txt) || true
+          if [ -z "$AGENT_TEXT" ] && [ -s /tmp/copilot-stderr.txt ]; then
+            echo "=== copilot CLI stderr ===" && cat /tmp/copilot-stderr.txt
+          fi
 
           # Discover session ID for new sessions
           # CLI stores sessions at $XDG_STATE_HOME/.copilot/session-state/<UUID>/ (depth 3)
