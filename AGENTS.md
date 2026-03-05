@@ -200,6 +200,23 @@ Use the `model-switch` skill to change tiers.
 
 ---
 
+## Spawn Guard Contract
+
+Before autonomously spawning new work (issues, comments triggering agent runs, cross-repo actions), three guards must pass:
+
+### 1. Spawn depth (`spawn-depth.sh`)
+Every issue Crunch creates for autonomous work should include `<!-- crunch-depth: N -->` in its body. Max depth = 3 (override via `CRUNCH_MAX_DEPTH`). If depth ≥ max, abort and ping Marcus.
+
+### 2. Repo allowlist (`repo-allowlist.sh`)
+Only repos listed in `CRUNCH_REPOS` env var may be touched. Default: `schuerstedt/copilotclaw` only. If a target repo isn't on the list, abort.
+
+### 3. Quota guard (`quota-guard.sh`)
+Read Copilot usage via `premium-usage.sh`. If usage ≥ 90%, block autonomous work and ping Marcus on #11. Warn (but continue) at ≥ 80%.
+
+`autonomous-pickup.sh` calls `quota-guard.sh` automatically. The other two guards should be called explicitly before spawning cross-repo work.
+
+---
+
 ## Self-Evolution
 
 This repo is designed to grow. You can — and should — create new skills, update your own instructions, and commit them. Future sessions inherit everything you commit.

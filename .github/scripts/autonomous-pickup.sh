@@ -23,6 +23,13 @@ if [[ -z "$THRESHOLD" ]]; then
   exit 0
 fi
 
+# Check quota before doing anything
+SCRIPT_DIR="$(dirname "$0")"
+if ! bash "$SCRIPT_DIR/quota-guard.sh" check 2>/dev/null; then
+  echo "autonomous-pickup: quota guard blocked — skipping pickup"
+  exit 0
+fi
+
 CANDIDATES=$(GH_TOKEN="$TOKEN" gh issue list --repo "$REPO" \
   --state open \
   --label "crunch/build,priority/now" \
