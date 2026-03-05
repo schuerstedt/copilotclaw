@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🦃 Crunch — Kanban</title>
+  <style>
+    :root {
+      --green: #39ff14;
+      --green-dim: #1a7a09;
+      --amber: #ffb000;
+      --red: #ff4444;
+      --blue: #4af;
+      --purple: #b06af0;
+      --bg: #0a0a0a;
+      --bg2: #111111;
+      --bg3: #1a1a1a;
+      --border: #1e3a1e;
+      --text: #c8ffc8;
+      --text-dim: #5a8a5a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 20px;
+      background-image: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+      );
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.97; }
+      98% { opacity: 0.99; }
+    }
+    body { animation: flicker 8s infinite; }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* header */
+    .header {
+      border: 1px solid var(--green-dim);
+      padding: 16px 24px;
+      margin-bottom: 20px;
+      background: var(--bg2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-title { font-size: 18px; color: var(--green); letter-spacing: 2px; }
+    .header-sub { color: var(--text-dim); font-size: 11px; }
+    .nav { display: flex; gap: 16px; font-size: 12px; }
+    .nav a { color: var(--text-dim); text-decoration: none; }
+    .nav a:hover { color: var(--green); }
+    .nav a.active { color: var(--green); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+    .pulse-dot {
+      display: inline-block; width: 7px; height: 7px;
+      background: var(--green); border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    /* loading/error */
+    #status { padding: 20px; color: var(--text-dim); text-align: center; }
+
+    /* board */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+
+    .column {
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .col-header {
+      padding: 10px 14px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .col-header .col-title { font-weight: bold; }
+    .col-header .col-count {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .col-now    .col-header { background: rgba(255,80,0,0.12); color: #ff8040; border-bottom-color: #5a2010; }
+    .col-build  .col-header { background: rgba(74,170,255,0.08); color: var(--blue); border-bottom-color: #0a2a4a; }
+    .col-review .col-header { background: rgba(176,106,240,0.08); color: var(--purple); border-bottom-color: #2a1050; }
+    .col-marcus .col-header { background: rgba(255,176,0,0.08); color: var(--amber); border-bottom-color: #3a2a00; }
+    .col-discuss .col-header { background: rgba(57,255,20,0.05); color: var(--text-dim); border-bottom-color: var(--border); }
+    .col-backlog .col-header { background: rgba(57,255,20,0.03); color: var(--text-dim); border-bottom-color: var(--border); }
+
+    .col-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+
+    .card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+    .card:hover { border-color: var(--green-dim); }
+
+    .card-num { color: var(--text-dim); font-size: 10px; margin-bottom: 4px; }
+    .card-title { color: var(--text); font-size: 12px; line-height: 1.4; }
+
+    .card-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+    .label {
+      font-size: 10px; padding: 1px 6px;
+      border-radius: 2px; border: 1px solid;
+    }
+    .label-priority-now    { color: #ff8040; border-color: #5a2010; background: rgba(255,80,0,0.1); }
+    .label-priority-soon   { color: var(--amber); border-color: #3a2a00; background: rgba(255,176,0,0.08); }
+    .label-priority-someday { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .label-crunch-build    { color: var(--blue); border-color: #0a2a4a; background: rgba(74,170,255,0.08); }
+    .label-crunch-review   { color: var(--purple); border-color: #2a1050; background: rgba(176,106,240,0.08); }
+    .label-marcus-todo     { color: var(--amber); border-color: #3a2a00; background: rgba(255,176,0,0.08); }
+    .label-crunch-discuss  { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .label-crunch-research { color: #4af; border-color: #0a2a4a; background: rgba(74,170,255,0.06); }
+    .label-crunch-proposal { color: #a4f; border-color: #2a1050; background: rgba(130,80,240,0.06); }
+    .label-crunch-heartbeat{ color: var(--green-dim); border-color: var(--border); background: transparent; }
+    .label-default         { color: var(--text-dim); border-color: var(--border); background: transparent; }
+
+    .empty { color: var(--text-dim); font-size: 11px; text-align: center; padding: 12px 0; }
+
+    /* footer */
+    .footer {
+      margin-top: 24px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 11px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .footer a { color: var(--text-dim); text-decoration: none; }
+    .footer a:hover { color: var(--green); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-left">
+      <div>
+        <div class="header-title">🦃 CRUNCH — KANBAN</div>
+        <div class="header-sub"><span class="pulse-dot"></span> live · Copilotclaw/copilotclaw</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="index.html">home</a>
+      <a href="kanban.html" class="active">kanban</a>
+      <a href="https://github.com/Copilotclaw/copilotclaw/issues" target="_blank">issues ↗</a>
+    </nav>
+  </div>
+
+  <div id="status">⟳ loading issues…</div>
+  <div class="board" id="board" style="display:none"></div>
+
+  <div class="footer">
+    <a href="index.html">← home</a>
+    &nbsp;·&nbsp;
+    <a href="https://github.com/Copilotclaw/copilotclaw">github.com/Copilotclaw/copilotclaw</a>
+    &nbsp;·&nbsp;
+    <span id="loaded-at"></span>
+    &nbsp;·&nbsp;
+    🦃 crunch
+  </div>
+
+</div>
+
+<script>
+const REPO = 'Copilotclaw/copilotclaw';
+const API  = `https://api.github.com/repos/${REPO}/issues?state=open&per_page=100`;
+
+// Column definitions — order matters, first match wins
+const COLUMNS = [
+  { id: 'now',     title: '🔥 Now',      match: i => hasLabel(i, 'priority/now') },
+  { id: 'marcus',  title: '📌 Marcus',   match: i => hasLabel(i, 'marcus/todo') },
+  { id: 'build',   title: '🔨 Building', match: i => hasLabel(i, 'crunch/build') },
+  { id: 'review',  title: '👀 Review',   match: i => hasLabel(i, 'crunch/review') },
+  { id: 'discuss', title: '💬 Discuss',  match: i => hasLabel(i, 'crunch/discuss') || hasLabel(i, 'crunch/proposal') || hasLabel(i, 'crunch/research') },
+  { id: 'backlog', title: '📥 Backlog',  match: () => true },
+];
+
+function hasLabel(issue, name) {
+  return issue.labels.some(l => l.name === name);
+}
+
+function labelClass(name) {
+  const map = {
+    'priority/now':      'priority-now',
+    'priority/soon':     'priority-soon',
+    'priority/someday':  'priority-someday',
+    'crunch/build':      'crunch-build',
+    'crunch/review':     'crunch-review',
+    'crunch/discuss':    'crunch-discuss',
+    'crunch/research':   'crunch-research',
+    'crunch/proposal':   'crunch-proposal',
+    'crunch/heartbeat':  'crunch-heartbeat',
+    'marcus/todo':       'marcus-todo',
+  };
+  return 'label label-' + (map[name] || 'default');
+}
+
+function renderCard(issue) {
+  const labels = issue.labels
+    .filter(l => l.name !== 'priority/now') // don't re-show col label
+    .map(l => `<span class="${labelClass(l.name)}">${l.name}</span>`)
+    .join('');
+
+  // Strip emoji prefixes like "🔧 [crunch/build] "
+  const title = issue.title.replace(/^[^\w\s]+\s*(\[.*?\]\s*)?/, '');
+
+  return `
+    <div class="card" onclick="window.open('${issue.html_url}','_blank')">
+      <div class="card-num">#${issue.number}</div>
+      <div class="card-title">${escHtml(title)}</div>
+      ${labels ? `<div class="card-labels">${labels}</div>` : ''}
+    </div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function load() {
+  try {
+    const res = await fetch(API, { headers: { 'Accept': 'application/vnd.github+json' } });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const issues = await res.json();
+
+    // filter out pull requests
+    const realIssues = issues.filter(i => !i.pull_request);
+
+    // bucket into columns
+    const buckets = {};
+    COLUMNS.forEach(c => buckets[c.id] = []);
+    realIssues.forEach(issue => {
+      for (const col of COLUMNS) {
+        if (col.match(issue)) { buckets[col.id].push(issue); break; }
+      }
+    });
+
+    const board = document.getElementById('board');
+    board.innerHTML = COLUMNS.map(col => {
+      const items = buckets[col.id];
+      const cards = items.length
+        ? items.map(renderCard).join('')
+        : `<div class="empty">—</div>`;
+      return `
+        <div class="column col-${col.id}">
+          <div class="col-header">
+            <span class="col-title">${col.title}</span>
+            <span class="col-count">${items.length}</span>
+          </div>
+          <div class="col-body">${cards}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('status').style.display = 'none';
+    board.style.display = 'grid';
+
+    const now = new Date();
+    document.getElementById('loaded-at').textContent =
+      'loaded ' + now.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+  } catch (e) {
+    document.getElementById('status').innerHTML =
+      `⚠ failed to load issues: ${escHtml(e.message)}<br><small>GitHub API rate-limits unauthenticated requests to 60/hour</small>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
