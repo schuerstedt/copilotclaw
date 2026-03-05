@@ -44,7 +44,7 @@ or pass `--log-usage /tmp/crunch_azure_calls.jsonl` directly.
 ### 3. Copilot premium quota
 
 ```bash
-bash .github/skills/session-stats/scripts/premium-usage.sh schuerstedt
+bash .github/skills/session-stats/scripts/premium-usage.sh copilotclaw
 ```
 
 Output: `47 / 300 requests (15%)`. **Setup**: `COPILOT_PAT` needs "Plan" user permission — see AGENTS.md.

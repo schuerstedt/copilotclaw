@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # autonomous-pickup.sh
 # Scans for crunch/build issues labeled priority/now and posts a pickup comment
-# using BILLING_PAT (authenticates as schuerstedt, not github-actions[bot]),
+# using BILLING_PAT (authenticates as copilotclaw, not github-actions[bot]),
 # which triggers agent.yml to work the issue.
 
 set -euo pipefail
 
-REPO="schuerstedt/copilotclaw"
+REPO="Copilotclaw/copilotclaw"
 TOKEN="${BILLING_PAT:-}"
 
 if [[ -z "$TOKEN" ]]; then
