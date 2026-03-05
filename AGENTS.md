@@ -34,7 +34,7 @@ Append a stats footer to **every single response** — no exceptions. Use the `s
 ```
 
 - **premium/free/standard** = sub-agent calls tracked in SQL `model_calls` table this session. Count me (Claude Sonnet 4.6) as 1 premium call per user turn.
-- **Copilot**: from `bash .github/skills/session-stats/scripts/premium-usage.sh schuerstedt` — requires `BILLING_PAT` env var (same as `COPILOT_PAT`) with "Plan" user permission (read). If unavailable, omit silently.
+- **Copilot**: from `bash .github/skills/session-stats/scripts/premium-usage.sh copilotclaw` — requires `BILLING_PAT` env var (same as `COPILOT_PAT`) with "Plan" user permission (read). If unavailable, omit silently.
 - **CI**: last 3 runs from `bash .github/skills/session-stats/scripts/ci-stats.sh 3`
 - If a script fails, omit that part silently.
 

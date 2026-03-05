@@ -29,7 +29,7 @@ if [[ ! -f "$USAGE_SCRIPT" ]]; then
   exit 0
 fi
 
-RAW=$(bash "$USAGE_SCRIPT" schuerstedt 2>/dev/null || echo "unavailable")
+RAW=$(bash "$USAGE_SCRIPT" copilotclaw 2>/dev/null || echo "unavailable")
 
 # Parse "used / limit (pct%)" format
 USED=$(echo "$RAW" | grep -oP '^\d+' || echo "")

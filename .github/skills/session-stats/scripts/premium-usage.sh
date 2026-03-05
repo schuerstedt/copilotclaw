@@ -7,7 +7,7 @@
 # Output (no token):    "no BILLING_PAT — add Plan permission to COPILOT_PAT"
 # Output (API error):   "unavailable"
 
-USERNAME="${1:-schuerstedt}"
+USERNAME="${1:-copilotclaw}"
 
 if [ -z "${BILLING_PAT:-}" ]; then
   echo "no BILLING_PAT — see AGENTS.md setup"

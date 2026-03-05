@@ -78,7 +78,7 @@ Don't spawn issues for the sake of it. Spawn them when there's a real thing to d
 ### Autonomous pickup (run every heartbeat)
 
 Scan for `crunch/build` + `priority/now` issues idle >2h and post a pickup comment via `$BILLING_PAT`
-(authenticates as schuerstedt, bypasses the bot filter in agent.yml):
+(authenticates as copilotclaw, bypasses the bot filter in agent.yml):
 
 ```bash
 bash .github/scripts/autonomous-pickup.sh
