@@ -28,6 +28,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Authenticate gh CLI with the Copilot PAT so the copilot CLI can find auth
+          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token
+
           # Configure git
           git config user.name "gitclaw[bot]"
           git config user.email "gitclaw[bot]@users.noreply.github.com"

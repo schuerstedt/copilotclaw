@@ -62,6 +62,10 @@ jobs:
           AZURE_APIKEY: ${{ secrets.AZURE_APIKEY }}
         run: |
           set -euo pipefail
+
+          # Authenticate gh CLI with the Copilot PAT so the copilot CLI can find auth
+          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token
+
           ISSUE_NUMBER=$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")
 
           # Fetch issue
