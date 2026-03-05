@@ -5,6 +5,10 @@ on:
     - cron: '*/30 * * * *'  # every 30 minutes
   workflow_dispatch:          # also manually triggerable
 
+concurrency:
+  group: copilotclaw-work
+  cancel-in-progress: false
+
 permissions:
   contents: write
   issues: write
@@ -15,6 +19,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Autonomous pickup
+        env:
+          BILLING_PAT: ${{ secrets.COPILOT_PAT }}
+        run: bash .github/scripts/autonomous-pickup.sh
 
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
