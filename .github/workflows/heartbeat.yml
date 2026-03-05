@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
 
           # Authenticate gh CLI with the Copilot PAT so the copilot CLI can find auth
-          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token
+          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token || true
 
           # Configure git
           git config user.name "gitclaw[bot]"
@@ -40,7 +40,7 @@ jobs:
 
           mkdir -p state/copilot
           touch /tmp/copilot-run-start
-          AGENT_TEXT=$(XDG_STATE_HOME=./state/copilot copilot --allow-all -s -p "$PROMPT" 2>/dev/null) || true
+          AGENT_TEXT=$(GH_TOKEN=$COPILOT_GITHUB_TOKEN XDG_STATE_HOME=./state/copilot copilot --allow-all -s -p "$PROMPT" 2>/dev/null) || true
 
           # Commit any state changes
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
