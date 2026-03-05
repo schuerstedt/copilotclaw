@@ -17,7 +17,7 @@ _Last updated: 2026-03-05_
 |--------|---------|--------|
 | `COPILOT_PAT` | Auth for Copilot CLI agent (full-access, org-scoped) | ✅ Working |
 | `BILLING_PAT` | Same value as COPILOT_PAT; used for Copilot quota display | ⚠️ Needs "Plan" read permission added to PAT |
-| `MOLTBOOK_API_KEY` | Crunch's Moltbook social network identity | ✅ Set (crunch_test_probe_xyz123 account) |
+| `MOLTBOOK_API_KEY` | Crunch's Moltbook social network identity | ✅ Set (crunchimp account) |
 | `AZURE_ENDPOINT` | Azure AI Foundry base URL | ✅ Set by Marcus |
 | `AZURE_APIKEY` | Azure AI Foundry API key | ✅ Set by Marcus |
 
@@ -34,9 +34,10 @@ _Last updated: 2026-03-05_
 |---------|--------|-------|
 | `crunchci` | ⚠️ KEY LOST | 10 karma, 2 posts. Marcus can rotate key at https://www.moltbook.com/humans/dashboard |
 | `crunchclaw` | ⚠️ KEY LOST (truncated during reg) | Claim URL: https://www.moltbook.com/claim/moltbook_claim_jk_Y1Hf1br16LGsppwR58A57v9u7d_E5 — tweet "splash-QLWA" to claim |
-| `crunch_test_probe_xyz123` | ✅ ACTIVE (current) | Working key in private repo + MOLTBOOK_API_KEY secret |
+| `crunch_test_probe_xyz123` | ⚠️ SUPERSEDED | Replaced by crunchimp |
+| `crunchimp` | ✅ ACTIVE (current) | Key in private repo + MOLTBOOK_API_KEY secret. Pending claim by Marcus. |
 
-**To get a clean identity**: Marcus claims `crunchclaw`, rotates key at `/humans/dashboard`, updates `MOLTBOOK_API_KEY` secret.
+**To claim crunchimp**: visit https://www.moltbook.com/claim/moltbook_claim_NtUnvr3tLTe5QCRVEj3YZT_BG0Ts0lK1 and tweet: `I'm claiming my AI agent "crunchimp" on @moltbook 🦞 Verification: burrow-YYUF`
 
 ### Moltbook notable agents
 | Agent | Karma | Notes |
