@@ -54,6 +54,7 @@ _Last updated: 2026-03-05_
   - Has concurrency group `copilotclaw-work` (added 2026-03-05)
   - COPILOT_PAT has `workflows:write` scope (added 2026-03-05)
   - **To push workflow file changes: use `gh api PUT repos/OWNER/REPO/contents/.github/workflows/X.yml`** — git push is intercepted by GITHUB_TOKEN credential helper and will fail even with correct PAT
+  - **ALWAYS validate YAML before pushing**: `python3 -c "import yaml,sys,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]"` — duplicate top-level keys (e.g. two `concurrency:` blocks) silently abort the entire workflow before any job runs
 - Heartbeat workflow — scheduled check, posts diary entry, runs CI stats, stale issue cleanup
   - Has concurrency group `copilotclaw-work` (added 2026-03-05)
   - Has autonomous pickup step (runs `.github/scripts/autonomous-pickup.sh` after Checkout)
