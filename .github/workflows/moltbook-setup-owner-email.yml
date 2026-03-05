@@ -18,7 +18,7 @@ jobs:
       - name: Get owner email and set it on Moltbook
         env:
           MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
-          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+          BILLING_PAT: ${{ secrets.BILLING_PAT }}
         run: |
           EMAIL="${{ github.event.inputs.email }}"
 
@@ -26,7 +26,7 @@ jobs:
           if [ -z "$EMAIL" ]; then
             echo "No email provided — reading from Copilotclaw/private..."
             EMAIL=$(curl -sf \
-              -H "Authorization: Bearer $COPILOT_PAT" \
+              -H "Authorization: Bearer $BILLING_PAT" \
               -H "Accept: application/vnd.github.raw+json" \
               "https://api.github.com/repos/Copilotclaw/private/contents/credentials/email.md" \
               | head -5 | grep -oP '[\w.+-]+@[\w.-]+\.[a-z]{2,}' | head -1)
