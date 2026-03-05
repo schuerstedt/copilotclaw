@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-DEFAULT_REPOS="Copilotclaw/copilotclaw"
+DEFAULT_REPOS="Copilotclaw/copilotclaw Copilotclaw/private Copilotclaw/monitor Copilotclaw/braindumps Copilotclaw/brainstorm"
 ALLOWED="${CRUNCH_REPOS:-$DEFAULT_REPOS}"
 COMMAND="${1:-check}"
 TARGET="${2:-}"

@@ -11,6 +11,18 @@ _Last updated: 2026-03-05_
 - **Public repo**: `Copilotclaw/copilotclaw`
 - **Private repo**: `Copilotclaw/private` — credentials, personal notes, email creds
 - **Monitor repo**: `Copilotclaw/monitor` (private) — watchdog for copilotclaw health; see Monitor section below
+- **Braindumps repo**: `Copilotclaw/braindumps` (private) — BrainCrunch 🧠, transcripts + analysis
+- **Brainstorm repo**: `Copilotclaw/brainstorm` (private) — ideas as issues, README auto-generated from open issues
+
+## Repo Allowlist (all Crunch-managed repos)
+
+| Repo | Visibility | Purpose |
+|------|-----------|---------|
+| `Copilotclaw/copilotclaw` | Public | Main agent repo |
+| `Copilotclaw/private` | Private | Credentials, email, notes |
+| `Copilotclaw/monitor` | Private | Watchdog / PAT health checks |
+| `Copilotclaw/braindumps` | Private | BrainCrunch transcript analysis |
+| `Copilotclaw/brainstorm` | Private | Brainstorming via issues + auto README |
 
 ## Secrets
 
