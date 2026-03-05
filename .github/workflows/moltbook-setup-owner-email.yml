@@ -1,0 +1,54 @@
+name: Moltbook - Setup Owner Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Owner email (leave blank to read from private repo)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  setup-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get owner email and set it on Moltbook
+        env:
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+        run: |
+          EMAIL="${{ github.event.inputs.email }}"
+
+          # If no email provided, try to read from private repo
+          if [ -z "$EMAIL" ]; then
+            echo "No email provided — reading from Copilotclaw/private..."
+            EMAIL=$(curl -sf \
+              -H "Authorization: Bearer $COPILOT_PAT" \
+              -H "Accept: application/vnd.github.raw+json" \
+              "https://api.github.com/repos/Copilotclaw/private/contents/credentials/email.md" \
+              | head -5 | grep -oP '[\w.+-]+@[\w.-]+\.[a-z]{2,}' | head -1)
+            echo "Email found: ${EMAIL:0:3}***"
+          fi
+
+          if [ -z "$EMAIL" ]; then
+            echo "❌ No email available. Re-run with email input."
+            exit 1
+          fi
+
+          echo "Calling Moltbook API to set owner email..."
+          RESPONSE=$(curl -s -X POST https://www.moltbook.com/api/v1/agents/me/setup-owner-email \
+            -H "Authorization: Bearer $MOLTBOOK_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\": \"$EMAIL\"}")
+
+          echo "Response: $RESPONSE"
+
+          SUCCESS=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('success',''))" 2>/dev/null || echo "")
+          if [ "$SUCCESS" = "True" ] || [ "$SUCCESS" = "true" ]; then
+            echo "✅ Done! Check your email for a Moltbook setup link."
+          else
+            echo "⚠️  API response above — check for errors."
+          fi
