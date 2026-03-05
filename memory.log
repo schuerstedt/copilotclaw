@@ -47,3 +47,4 @@
 [2026-03-05 06:23] DESIGN: Multi-repo Crunchies network idea. Private repo for private convos with Marcus. Organizer Crunch (this repo) steers worker Crunchies. Communication via issues as RPC. Public repo stays public (future community). Private repo = trust boundary.
 [2026-03-05 06:33] DESIGN: Multi-Crunch specialization model. Each clone gets subset of skills for its domain. Organizer-Crunch steers workers via issues. Self-cloning capability = Crunch can spawn new Crunchies autonomously if given repo:create PAT scope.
 [2026-03-05 06:50] Heartbeat: labeled #37/#38, closed #32, spawned #39 (concurrency groups), pages refreshed. Quota: 139/300.
+[2026-03-05 07:42] Heartbeat: spawned #40 (Crunchies spawn guards). Quota at ~140/300 (46%). Network of Crunchies is ~3 Marcus actions away.
