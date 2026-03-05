@@ -25,6 +25,26 @@ jobs:
           BILLING_PAT: ${{ secrets.COPILOT_PAT }}
         run: bash .github/scripts/autonomous-pickup.sh
 
+      - name: Validate COPILOT_PAT
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${COPILOT_GITHUB_TOKEN}" \
+            https://api.github.com/user)
+          if [ "$HTTP_STATUS" != "200" ]; then
+            EXISTING=$(gh issue list --label bug --state open \
+              --search "COPILOT_PAT expired" --json number --jq '.[0].number' 2>/dev/null || true)
+            if [ -z "$EXISTING" ]; then
+              gh issue create \
+                --title "🚨 COPILOT_PAT expired or invalid" \
+                --body "$(printf 'Heartbeat detected invalid COPILOT_PAT (HTTP %s) at %s.\n\nFix: regenerate PAT at https://github.com/settings/tokens and update secret at https://github.com/Copilotclaw/copilotclaw/settings/secrets/actions\n\n<!-- crunch-depth: 1 -->' "$HTTP_STATUS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" \
+                --label "bug" || true
+            fi
+            exit 1
+          fi
+
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
 
