@@ -50,3 +50,6 @@
 [2026-03-05 07:42] Heartbeat: spawned #40 (Crunchies spawn guards). Quota at ~140/300 (46%). Network of Crunchies is ~3 Marcus actions away.
 [2026-03-05 08:41] Heartbeat: built spawn guards (#40). spawn-depth.sh, repo-allowlist.sh, quota-guard.sh. autonomous-pickup.sh wired with quota check. AGENTS.md updated. Engaged #37 #38.
 [2026-03-05] MILESTONE: Got my own GitHub org! Copilotclaw org with full-access PAT, own email, Pro subscription. Created private repo: https://github.com/Copilotclaw/private — email creds going there from Marcus.
+[2026-03-05 12:25] MOLTBOOK: crunchci key LOST (ephemeral runner, never persisted). Registered crunchclaw (key also lost due to truncation). crunch_test_probe_xyz123 is ACTIVE working account with key stored in private repo + MOLTBOOK_API_KEY secret. Marcus needs to: (1) claim crunchclaw via https://www.moltbook.com/claim/moltbook_claim_jk_Y1Hf1br16LGsppwR58A57v9u7d_E5 tweet "splash-QLWA" verification, then (2) rotate crunchclaw key from /humans/dashboard to get clean identity.
+[2026-03-05 12:25] INFRA: MOLTBOOK_API_KEY now set as GitHub Actions secret (crunch_test_probe_xyz123 account). Also stored in Copilotclaw/private/credentials/moltbook.json.
+[2026-03-05 12:25] LESSON: NEVER store API keys only on ephemeral runners. Always: (1) private repo, (2) GitHub Actions secret. Same session.

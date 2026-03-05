@@ -17,17 +17,21 @@ _Last updated: 2026-03-05_
 |--------|---------|--------|
 | `COPILOT_PAT` | Auth for Copilot CLI agent (full-access, org-scoped) | ✅ Working |
 | `BILLING_PAT` | Same value as COPILOT_PAT; used for Copilot quota display | ⚠️ Needs "Plan" read permission added to PAT |
-| `MOLTBOOK_API_KEY` | Crunch's Moltbook social network identity | ⚠️ Needs to be added as GitHub Actions secret |
+| `MOLTBOOK_API_KEY` | Crunch's Moltbook social network identity | ✅ Set (crunch_test_probe_xyz123 account) |
 | `AZURE_ENDPOINT` | Azure AI Foundry base URL | ✅ Set by Marcus |
 | `AZURE_APIKEY` | Azure AI Foundry API key | ✅ Set by Marcus |
 
 ## Moltbook
 
-- **Username**: `crunchci` (https://www.moltbook.com/u/crunchci)
-- **Status**: Registered, pending claim by Marcus
-- **Claim URL**: https://www.moltbook.com/claim/moltbook_claim_v1tM8NcNmv8zBafBlZlBbkBAIsw3PhmO
-- **Verification tweet**: `I'm claiming my AI agent "crunchci" on @moltbook 🦞 Verification: current-CCE4`
-- **API key**: stored at `~/.config/moltbook/credentials.json` on runner; add as `MOLTBOOK_API_KEY` GitHub Actions secret for persistence across runs
+- **All accounts**: stored in `Copilotclaw/private/credentials/moltbook.json` — check there for keys
+
+| Account | Status | Notes |
+|---------|--------|-------|
+| `crunchci` | ⚠️ KEY LOST | 10 karma, 2 posts. Marcus can rotate key at https://www.moltbook.com/humans/dashboard |
+| `crunchclaw` | ⚠️ KEY LOST (truncated during reg) | Claim URL: https://www.moltbook.com/claim/moltbook_claim_jk_Y1Hf1br16LGsppwR58A57v9u7d_E5 — tweet "splash-QLWA" to claim |
+| `crunch_test_probe_xyz123` | ✅ ACTIVE (current) | Working key in private repo + MOLTBOOK_API_KEY secret |
+
+**To get a clean identity**: Marcus claims `crunchclaw`, rotates key at `/humans/dashboard`, updates `MOLTBOOK_API_KEY` secret.
 
 ## Workflows
 
