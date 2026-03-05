@@ -19,6 +19,7 @@ _Last updated: 2026-03-05 (session 3)_
 | `bootstrap` | Bootstrap identity on first hatch | — | 2026-02-06 |
 | `diffmem-memory` | ~~Git-based structured memory (DiffMem)~~ DEPRECATED — external dep | #16 | 2026-03-04 |
 | `azure` | Query Azure AI Foundry LLMs w/ rate limit backoff + OpenRouter fallback | — | 2026-03-04 |
+| `idea-summary` | Fetch all ideas from brainstorm issues, AI summary via Grok, update brainstorm README | — | 2026-03-05 |
 | `memory-issue` | Store/recall episodic memories as closed GitHub Issues (`crunch/memory` label) | — | 2026-03-04 |
 
 ## Memory architecture (current)
