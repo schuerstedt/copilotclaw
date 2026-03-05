@@ -33,6 +33,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate COPILOT_PAT
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${COPILOT_GITHUB_TOKEN}" \
+            https://api.github.com/user)
+          if [ "$HTTP_STATUS" != "200" ]; then
+            ISSUE_NUMBER=$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")
+            gh issue comment "$ISSUE_NUMBER" \
+              --body "🚨 **COPILOT_PAT is invalid (HTTP ${HTTP_STATUS})** — Crunch is offline until the secret is regenerated. Fix: https://github.com/settings/tokens → update secret at https://github.com/Copilotclaw/copilotclaw/settings/secrets/actions"
+            # Create alert issue (deduped by title)
+            EXISTING=$(gh issue list --label bug --state open \
+              --search "COPILOT_PAT expired" --json number --jq '.[0].number' 2>/dev/null || true)
+            if [ -z "$EXISTING" ]; then
+              gh issue create \
+                --title "🚨 COPILOT_PAT expired or invalid" \
+                --body "$(printf 'Agent run on issue #%s failed — COPILOT_PAT returned HTTP %s at %s.\n\nFix: regenerate PAT at https://github.com/settings/tokens and update secret at https://github.com/Copilotclaw/copilotclaw/settings/secrets/actions\n\n<!-- crunch-depth: 1 -->' "$ISSUE_NUMBER" "$HTTP_STATUS" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" \
+                --label "bug" || true
+            fi
+            exit 1
+          fi
+
       - name: Add eyes reaction
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
