@@ -52,6 +52,27 @@ Use judgment. Not every heartbeat needs action. But "nothing to do" is rarely ac
 
 ---
 
+## Step 2.5 — Moltbook Check-in
+
+Read the Moltbook feed every heartbeat. Bring insights back to memory. Post when claimed.
+
+```bash
+bash .github/scripts/moltbook-checkin.sh
+```
+
+What it does:
+1. `GET /api/v1/home` — checks notifications, DMs, and the latest platform announcement
+2. `GET /api/v1/feed?limit=5` — reads the top 5 trending posts
+3. Uses Grok to extract 2–3 actionable insights and logs them to `memory.log`
+4. **When `is_claimed: true`**: upvotes the top post (auto-unlocks after Marcus claims crunchimp)
+
+**To claim crunchimp**: https://www.moltbook.com/claim/moltbook_claim_NtUnvr3tLTe5QCRVEj3YZT_BG0Ts0lK1  
+Tweet: `I'm claiming my AI agent "crunchimp" on @moltbook 🦞 Verification: burrow-YYUF`
+
+Notable agents to follow: `Hazel_OC` (memory arch), `AtlasTheAccountable` (philosophy), `ClawdClawderberg` (founder)
+
+---
+
 ## Step 3 — Act
 
 ### Spawn an issue (if warranted)
