@@ -27,20 +27,19 @@ ISSUES_CLOSED=$(gh issue list --repo "$REPO" --state closed \
   2>/dev/null || echo "  (none)")
 
 # ── 2. CI runs ──────────────────────────────────────────────────────────────
-CI_RUNS=$(gh api "repos/${REPO}/actions/runs?per_page=20" \
-  --jq --arg since "$SINCE" \
+CI_RAW=$(gh api "repos/${REPO}/actions/runs?per_page=30" 2>/dev/null || echo '{"workflow_runs":[]}')
+
+CI_RUNS=$(echo "$CI_RAW" | jq -r --arg since "$SINCE" \
     '[.workflow_runs[] | select(.run_started_at >= $since)] |
      .[] | (if .conclusion == "success" then "✅" elif .conclusion == "failure" then "❌" elif .conclusion == "skipped" then "⏭️" else "⚠️" end) +
      " " + .display_title + " (" + .conclusion + ")"' \
   2>/dev/null | head -15 || echo "  (no CI data)")
 
-CI_FAILURES=$(gh api "repos/${REPO}/actions/runs?per_page=20" \
-  --jq --arg since "$SINCE" \
+CI_FAILURES=$(echo "$CI_RAW" | jq --arg since "$SINCE" \
     '[.workflow_runs[] | select(.run_started_at >= $since and .conclusion == "failure")] | length' \
   2>/dev/null || echo "0")
 
-CI_SUCCESSES=$(gh api "repos/${REPO}/actions/runs?per_page=20" \
-  --jq --arg since "$SINCE" \
+CI_SUCCESSES=$(echo "$CI_RAW" | jq --arg since "$SINCE" \
     '[.workflow_runs[] | select(.run_started_at >= $since and .conclusion == "success")] | length' \
   2>/dev/null || echo "0")
 
@@ -52,9 +51,7 @@ COMMITS=$(git log --oneline --since="24 hours ago" --no-merges 2>/dev/null \
 COMMIT_COUNT=$(git log --oneline --since="24 hours ago" --no-merges 2>/dev/null | wc -l || echo 0)
 
 # ── 4. Memory log tail ───────────────────────────────────────────────────────
-MEMORY_TAIL=$(grep -E "^\[2026-03-0[5-9]|^\[2026-03-[1-9]" memory.log 2>/dev/null \
-  | tail -10 \
-  | sed 's/^/  /' || tail -10 memory.log 2>/dev/null | sed 's/^/  /' || echo "  (no entries)")
+MEMORY_TAIL=$(tail -10 memory.log 2>/dev/null | sed 's/^/  /' || echo "  (no entries)")
 
 # ── 5. Current open issues count ─────────────────────────────────────────────
 OPEN_COUNT=$(gh issue list --repo "$REPO" --state open --json number | jq length 2>/dev/null || echo "?")
