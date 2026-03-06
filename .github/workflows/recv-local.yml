@@ -20,12 +20,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check secrets are configured
+        id: check_secrets
+        env:
+          CLAW_LOCAL_GPG_PUBLIC: ${{ secrets.CLAW_LOCAL_GPG_PUBLIC }}
+          CLAW_IMAP_HOST: ${{ secrets.CLAW_IMAP_HOST }}
+        run: |
+          if [ -z "$CLAW_LOCAL_GPG_PUBLIC" ] || [ -z "$CLAW_IMAP_HOST" ]; then
+            echo "⏭️  Strix secrets not yet configured — skipping recv poll"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install dependencies
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           sudo apt-get install -y gpg python3-pip
           pip3 install python-gnupg
 
       - name: Import Strix local GPG public key
+        if: steps.check_secrets.outputs.configured == 'true'
         env:
           CLAW_LOCAL_GPG_PUBLIC: ${{ secrets.CLAW_LOCAL_GPG_PUBLIC }}
         run: |
@@ -34,6 +49,7 @@ jobs:
           echo "Strix public key imported"
 
       - name: Check inbox for Strix results
+        if: steps.check_secrets.outputs.configured == 'true'
         env:
           CLAW_CLOUD_EMAIL: ${{ secrets.CLAW_CLOUD_EMAIL }}
           CLAW_CLOUD_EMAIL_PASS: ${{ secrets.CLAW_CLOUD_EMAIL_PASS }}
