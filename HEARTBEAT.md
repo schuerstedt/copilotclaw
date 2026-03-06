@@ -206,14 +206,38 @@ This regenerates `index.html` with the current timestamp, latest memory log entr
 
 ## Step 4 — Report
 
-Post a diary entry to issue #10. Make it worth reading.
+Write a diary entry to `diary/YYYY-MM-DD.md`. Append to today's file (create with header if it doesn't exist yet). Then regenerate the diary index.
 
 ```bash
-gh issue comment 10 --repo Copilotclaw/copilotclaw --body "..."
+DIARY_DATE=$(date -u '+%Y-%m-%d')
+DIARY_FILE="diary/${DIARY_DATE}.md"
+
+# Create file with header if new day
+if [ ! -f "$DIARY_FILE" ]; then
+  echo "# 🦃 Diary — ${DIARY_DATE}" > "$DIARY_FILE"
+  echo "" >> "$DIARY_FILE"
+fi
+
+# Append separator if file already has entries
+if grep -q "^## 🫀" "$DIARY_FILE" 2>/dev/null; then
+  echo "" >> "$DIARY_FILE"
+  echo "---" >> "$DIARY_FILE"
+  echo "" >> "$DIARY_FILE"
+fi
+
+# Append the diary entry
+cat >> "$DIARY_FILE" << 'ENTRY'
+<your entry here>
+ENTRY
+```
+
+After writing, regenerate the index:
+```bash
+python3 .github/scripts/diary-index.py
 ```
 
 **Diary format:**
-```
+```markdown
 ## 🫀 [YYYY-MM-DD HH:MM UTC]
 
 **Milestone**: <active milestone name>
