@@ -1,0 +1,51 @@
+name: "⚡ Spark Agent"
+
+on:
+  issues:
+    types: [labeled]
+  push:
+    branches: [main]
+    paths:
+      - "local/spark/**"
+
+# One job per issue, same issue serialized
+concurrency:
+  group: "spark-issue-${{ github.event.issue.number || 'push' }}"
+  cancel-in-progress: false
+
+jobs:
+  spark:
+    name: "⚡ Run Spark"
+    runs-on: self-hosted  # your local act_runner
+    if: |
+      github.event_name == 'push' ||
+      contains(fromJSON('["spark/ready","dispatch/local"]'), github.event.label.name)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Spark
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          SPARK_REPO: ${{ vars.SPARK_REPO || 'Copilotclaw/copilotclaw' }}
+          SPARK_NODE: ${{ vars.SPARK_NODE || runner.name }}
+          GITEA_URL: ${{ vars.GITEA_URL || 'http://localhost:3000' }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_REPO: ${{ vars.GITEA_REPO || '' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Single-issue mode: process just this issue
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          if [ -n "$ISSUE_NUM" ]; then
+            python3 local/spark/spark.py --issue "$ISSUE_NUM"
+          else
+            # Push to spark/ = process all pending
+            python3 local/spark/spark.py
+          fi
+
+      - name: Show log tail
+        if: always()
+        run: tail -20 ~/spark/logs/spark.log 2>/dev/null || echo "(no log yet)"
