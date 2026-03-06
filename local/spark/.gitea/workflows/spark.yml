@@ -33,9 +33,7 @@ jobs:
           GITEA_URL: ${{ vars.GITEA_URL || 'http://localhost:3000' }}
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           GITEA_REPO: ${{ vars.GITEA_REPO || '' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # No API keys needed — claude is locally authenticated via CLI
         run: |
           # Single-issue mode: process just this issue
           ISSUE_NUM="${{ github.event.issue.number }}"
