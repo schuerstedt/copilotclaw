@@ -128,3 +128,4 @@
 [2026-03-06 21:07] Heartbeat: Strix not responding — recv-local polls finding empty inbox. Pinged Marcus on #11. Spawned #74 (proposal: Strix ping/pong liveness). strix-local repo not visible in org listing.
 [2026-03-06T21:29:20Z] SPARK: Spark local agent runner shipped. local/spark/spark.py — multi-source (GitHub+Gitea), multi-agent (claude/gemini/codex/opencode/ollama), self-update via spark/update label. Commit c6bc3f6.
 2026-03-06T21:47:15Z PREFERENCE: No Anthropic API. Pure CLI — claude is locally authenticated. API key env vars removed from spark.yml (cc28170).
+[2026-03-06T21:57:55Z] Heartbeat: Spark architecture observed. Created spark/ready+claimed+update labels. Spawned #75 (deprecate email/GPG dispatch). recv-local doing 288 empty runs/day. Strix never ran. Spark is the path forward.
