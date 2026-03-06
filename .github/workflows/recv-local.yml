@@ -88,9 +88,10 @@ jobs:
               print(f"Processing: {subject} (issue #{issue_header})")
 
               # Extract issue number from subject or header
+              # Supports formats: #73, GH-73, issue-73
               issue_num = issue_header
               if not issue_num:
-                  m = re.search(r'#(\d+)', subject)
+                  m = re.search(r'(?:#|GH-|issue-|ISSUE-)(\d+)', subject, re.IGNORECASE)
                   if m:
                       issue_num = m.group(1)
 
