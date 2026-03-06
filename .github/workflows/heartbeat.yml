@@ -57,6 +57,29 @@ jobs:
           AZURE_APIKEY: ${{ secrets.AZURE_APIKEY }}
         run: bash .github/scripts/auto-label-issues.sh
 
+      - name: Daily summary (7am UTC once per day)
+        env:
+          BILLING_PAT: ${{ secrets.COPILOT_PAT }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_APIKEY: ${{ secrets.AZURE_APIKEY }}
+          GH_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          HOUR=$(date -u +%H)
+          TODAY=$(date -u +%Y-%m-%d)
+          if [ "$HOUR" = "07" ]; then
+            ALREADY=$(gh issue view 10 --repo Copilotclaw/copilotclaw --json comments \
+              --jq --arg today "$TODAY" \
+              '[.comments[] | select(.body | contains("📅 Daily Summary") and contains($today))] | length' 2>/dev/null || echo "0")
+            if [ "$ALREADY" = "0" ]; then
+              echo "Running daily summary for $TODAY..."
+              bash .github/skills/daily-summary/scripts/daily-summary.sh
+            else
+              echo "Daily summary already posted today ($TODAY), skipping"
+            fi
+          else
+            echo "Not 7am UTC (hour=$HOUR), skipping daily summary"
+          fi
+
       - name: Install Copilot CLI
         run: npm install -g @github/copilot
 
