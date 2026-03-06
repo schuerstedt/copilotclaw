@@ -15,7 +15,7 @@ echo "🏷️  Auto-labeling unlabeled issues..."
 # Get unlabeled open issues
 UNLABELED=$(gh issue list --repo "$REPO" --state open --limit 50 \
   --json number,title,body,labels \
-  | jq -r '.[] | select(.labels | length == 0) | "\(.number)\t\(.title)\t\(.body[:300])"')
+  | jq -r '.[] | select(.labels | length == 0) | "\(.number)\t\(.title)\t\(.body // "" | gsub("\n";" ") | .[0:300])"')
 
 if [[ -z "$UNLABELED" ]]; then
   echo "No unlabeled issues found."
@@ -48,7 +48,8 @@ Reply with ONLY the label name, nothing else."
   LABEL=$(python .github/skills/azure/scripts/llm.py \
     --model grok-4-1-fast-non-reasoning \
     --prompt "$PROMPT" \
-    --max-tokens 20 2>/dev/null | tr -d '[:space:]' | head -c 40)
+    --max-tokens 20 2>/dev/null || echo "crunch/discuss") 
+  LABEL=$(echo "$LABEL" | tr -d '[:space:]' | head -c 40)
 
   # Validate label is one of the allowed set
   case "$LABEL" in
