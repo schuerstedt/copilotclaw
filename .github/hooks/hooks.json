@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": ".github/hooks/scripts/session-start.sh",
+        "cwd": ".",
+        "timeoutSec": 15,
+        "statusMessage": "🦃 Loading Crunch memory..."
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": ".github/hooks/scripts/session-end.sh",
+        "cwd": ".",
+        "timeoutSec": 10
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": ".github/hooks/scripts/pre-tool-use.sh",
+        "cwd": ".",
+        "timeoutSec": 15,
+        "statusMessage": "🛡️ Checking tool permissions..."
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": ".github/hooks/scripts/post-tool-use.sh",
+        "cwd": ".",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
