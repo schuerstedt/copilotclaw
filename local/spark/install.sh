@@ -50,6 +50,13 @@ cp "$SCRIPT_DIR/spark.py"  "$SPARK_HOME/spark.py"
 cp "$SCRIPT_DIR/SPARK.md"  "$SPARK_HOME/SPARK.md"
 chmod +x "$SPARK_HOME/spark.py"
 
+# Copy skills directory
+if [ -d "$SCRIPT_DIR/skills" ]; then
+    cp -r "$SCRIPT_DIR/skills" "$SPARK_HOME/skills"
+    chmod +x "$SPARK_HOME"/skills/*/run.sh 2>/dev/null || true
+    echo "⚡ Skills installed: $(ls "$SPARK_HOME/skills" | tr '\n' ' ')"
+fi
+
 # ── 4. .env ───────────────────────────────────────────────────────────────────
 ENV_FILE="$SPARK_HOME/.env"
 if [ ! -f "$ENV_FILE" ]; then
@@ -63,6 +70,8 @@ export SPARK_NODE="${NODE_NAME}"
 export SPARK_LABELS="spark/ready,dispatch/local"
 export SPARK_CLAIMED_LABEL="spark/claimed"
 export SPARK_POLL_INTERVAL="30"
+export SPARK_HEARTBEAT_ISSUE="90"
+export SPARK_HEARTBEAT_INTERVAL="30"
 export SPARK_LOG="$HOME/spark/logs/spark.log"
 export SPARK_IDENTITY_FILE="$HOME/spark/SPARK.md"
 
@@ -73,6 +82,14 @@ export SPARK_IDENTITY_FILE="$HOME/spark/SPARK.md"
 
 # Optional: GitHub PAT (if gh auth login not set)
 # export GH_TOKEN="ghp_..."
+
+# Memory: Azure Cosmos DB (shared with Crunch)
+# export COSMOS_ENDPOINT="https://crunch-memory.documents.azure.com:443/"
+# export COSMOS_KEY="your-cosmos-key"
+
+# Azure AI Foundry (for skills LLM — azure/run.sh)
+# export AZURE_ENDPOINT="https://..."
+# export AZURE_APIKEY="your-azure-key"
 ENVEOF
     echo "📝 Created $ENV_FILE — edit it then source it"
 else
