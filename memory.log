@@ -191,3 +191,7 @@ SHIPPED: .github/scripts/lib/ — platform.py + 4 scripts. Works on GitHub+Gitea
 [2026-03-07T11:42:32Z] HOOK:SessionEnd reason=complete
 [2026-03-07T11:47:27Z] HOOK:SessionStart source=new
 [2026-03-07T11:47:55Z] HOOK:SessionEnd reason=complete
+[2026-03-07T11:53:10Z] HOOK:SessionStart source=new
+[2026-03-07T11:53:26Z] HOOK:ToolFailure tool=bash result=failure msg=Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation, indirect expansion, or nested command substitution) that could enable arbitrary code execution. Please rew
+[2026-03-07T11:53Z] Cosmos DB setup: COSMOS_ENDPOINT set ✅. COSMOS_KEY blocked — SP lacks DocumentDB listKeys permission. SP object id: 2dd70e11-08eb-4b78-bd4a-57edca0cda92. Marcus needs to run gh secret set COSMOS_KEY manually or grant SP DocumentDB Account Contributor role.
+[2026-03-07T11:54:31Z] HOOK:SessionEnd reason=complete
