@@ -147,7 +147,14 @@ jobs:
 
           # Run agent
           touch /tmp/copilot-run-start
-          COPILOT_ARGS=(copilot --allow-all -s -p "$PROMPT")
+          COPILOT_ARGS=(copilot --allow-all
+            --add-github-mcp-toolset issues
+            --add-github-mcp-toolset repos
+            --add-github-mcp-toolset pull_requests
+            --add-github-mcp-toolset actions
+            --add-github-mcp-toolset labels
+            --add-github-mcp-toolset search
+            -s -p "$PROMPT")
           if [ -n "$SESSION_ID" ]; then
             COPILOT_ARGS+=(--resume "$SESSION_ID")
           fi
