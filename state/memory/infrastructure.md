@@ -105,6 +105,38 @@ One key (`AZURE_APIKEY`) for all models. Endpoint: `AZURE_ENDPOINT`.
 
 **Use `grok-4-1-fast-non-reasoning` as default for all azure skill calls.**
 
+## Azure Cosmos DB (Crunch's Persistent Brain)
+
+- **Account**: `crunch-memory` (free tier, westeurope)
+- **Endpoint**: `https://crunch-memory.documents.azure.com:443/`
+- **Resource group**: `crunch-rg`
+- **Database**: `crunch`
+- **Container**: `memories`  |  Partition key: `/type`
+- **Secrets**: `COSMOS_ENDPOINT` + `COSMOS_KEY` in repo secrets ✅
+- **Auth**: REST API with master key (HMAC-SHA256) — no SDK needed
+
+**Document types** (values of `/type` partition key):
+
+| type | Description |
+|------|-------------|
+| `diary` | Heartbeat diary entries (every 30 min) |
+| `memory` | Long-term facts and decisions |
+| `session` | Session summaries |
+| `fact` | Discrete searchable facts |
+
+**Script**: `.github/scripts/cosmos-memory.py` — CLI for write/read/query/recent.
+
+```bash
+# Write a memory
+python3 .github/scripts/cosmos-memory.py write --type memory --content "..." --tags tag1,tag2
+
+# Read recent diary entries
+python3 .github/scripts/cosmos-memory.py recent --type diary --limit 5
+
+# Query
+python3 .github/scripts/cosmos-memory.py query --sql "SELECT TOP 5 * FROM c WHERE c.type='diary' ORDER BY c._ts DESC"
+```
+
 ## Model economy
 - General-purpose agents default to `gpt-4.1` (free tier) to save premium quota
 - Defined in AGENTS.md under "Model Economy" table
