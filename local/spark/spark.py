@@ -17,8 +17,6 @@ Environment:
   SPARK_LABELS        Comma-sep labels to watch (default: spark/ready,dispatch/local)
   SPARK_CLAIMED_LABEL Label to mark claimed (default: spark/claimed)
   SPARK_POLL_INTERVAL Seconds between polls (default: 30)
-  SPARK_HEARTBEAT_ISSUE  GitHub issue # for liveness pings (default: 90)
-  SPARK_HEARTBEAT_INTERVAL  Minutes between heartbeat posts in daemon mode (default: 30)
   SPARK_IDENTITY_FILE Path to SPARK.md injected as context (default: ./SPARK.md)
   SPARK_LOG           Log file path (default: ~/spark/spark.log)
   GITEA_URL           Gitea base URL (default: http://localhost:3000)
@@ -30,6 +28,7 @@ Environment:
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -45,7 +44,6 @@ REPO = os.getenv("SPARK_REPO", "Copilotclaw/copilotclaw")
 WATCH_LABELS = [l.strip() for l in os.getenv("SPARK_LABELS", "spark/ready,dispatch/local").split(",")]
 CLAIMED_LABEL = os.getenv("SPARK_CLAIMED_LABEL", "spark/claimed")
 POLL_INTERVAL = int(os.getenv("SPARK_POLL_INTERVAL", "30"))
-HEARTBEAT_INTERVAL = int(os.getenv("SPARK_HEARTBEAT_INTERVAL", "30")) * 60  # seconds
 LOG_FILE = os.getenv("SPARK_LOG", str(Path.home() / "spark" / "spark.log"))
 IDENTITY_FILE = os.getenv("SPARK_IDENTITY_FILE", str(Path(__file__).parent / "SPARK.md"))
 
@@ -201,7 +199,6 @@ def apply_self_update(issue: dict) -> tuple[str, str]:
     backup = spark_py.with_suffix(".py.bak")
 
     # If body contains a fenced ```python block, use it directly
-    import re
     code_match = re.search(r"```python\n(.*?)```", body, re.DOTALL)
     if code_match:
         new_code = code_match.group(1)
@@ -297,6 +294,29 @@ def ensure_github_label(name: str, color: str = "0075ca", description: str = "")
     )
 
 
+def ensure_gitea_labels():
+    """Create standard Spark labels in the local Gitea repo if they don't exist."""
+    if not GITEA_TOKEN:
+        return
+    owner, repo = (GITEA_REPO + "/").split("/")[:2]
+    existing = gitea_api("GET", f"/repos/{owner}/{repo}/labels?limit=50") or []
+    existing_names = {l["name"] for l in existing}
+    wanted = [
+        ("spark/ready",      "fbca04", "Spark: task ready for local agent"),
+        ("spark/claimed",    "0075ca", "Spark: task claimed by a node"),
+        ("spark/update",     "e4e669", "Spark: self-update instruction"),
+        ("dispatch/local",   "d4c5f9", "Dispatch to local (Spark) agent"),
+        ("dispatch/github",  "c2e0c6", "Bridged from GitHub — reply goes back there too"),
+    ]
+    for label_name, color, desc in wanted:
+        if label_name not in existing_names:
+            gitea_api("POST", f"/repos/{owner}/{repo}/labels", {
+                "name": label_name,
+                "color": f"#{color}",
+                "description": desc,
+            })
+
+
 # ─── Gitea source ─────────────────────────────────────────────────────────────
 
 def gitea_api(method: str, path: str, data: dict | None = None) -> dict | list | None:
@@ -326,7 +346,8 @@ def gitea_api(method: str, path: str, data: dict | None = None) -> dict | list |
 
 
 def gitea_fetch_tasks() -> list[dict]:
-    """Fetch open Gitea issues with watch labels that aren't claimed."""
+    """Fetch open Gitea issues with watch labels that aren't claimed.
+    Also picks up dispatch/github bridge issues missed by webhook."""
     if not GITEA_TOKEN:
         return []
 
@@ -335,21 +356,42 @@ def gitea_fetch_tasks() -> list[dict]:
     if not issues_raw:
         return []
 
-    watch_set = set(WATCH_LABELS)
+    watch_set = set(WATCH_LABELS) | {"dispatch/github"}
     tasks = []
     for issue in issues_raw:
         label_names = {l["name"] for l in issue.get("labels", [])}
         if label_names & watch_set and CLAIMED_LABEL not in label_names:
-            # Normalize to same shape as GitHub issues
             tasks.append({
                 "number": issue["number"],
                 "title": issue["title"],
                 "body": issue.get("body", ""),
                 "labels": issue.get("labels", []),
-                "comments": [],  # fetch separately if needed
+                "comments": [],
                 "_source": "gitea",
             })
     return tasks
+
+
+def gitea_fetch_issue(number: int) -> dict | None:
+    """Fetch a single Gitea issue by number, including its comments."""
+    if not GITEA_TOKEN:
+        return None
+    owner, repo = (GITEA_REPO + "/").split("/")[:2]
+    issue = gitea_api("GET", f"/repos/{owner}/{repo}/issues/{number}")
+    if not issue or issue.get("pull_request"):
+        return None
+    comments_raw = gitea_api("GET", f"/repos/{owner}/{repo}/issues/{number}/comments?limit=50") or []
+    return {
+        "number": issue["number"],
+        "title": issue["title"],
+        "body": issue.get("body", ""),
+        "labels": issue.get("labels", []),
+        "comments": [
+            {"author": {"login": c.get("user", {}).get("login", "?")}, "body": c.get("body", "")}
+            for c in comments_raw
+        ],
+        "_source": "gitea",
+    }
 
 
 def gitea_comment(number: int, body: str):
@@ -371,6 +413,71 @@ def gitea_remove_label(number: int, label_name: str):
     label_id = next((l["id"] for l in labels if l["name"] == label_name), None)
     if label_id:
         gitea_api("DELETE", f"/repos/{owner}/{repo}/issues/{number}/labels/{label_id}")
+
+
+# ─── GitHub → Gitea bridge ────────────────────────────────────────────────────
+
+def extract_github_issue_number(body: str) -> int | None:
+    """Extract a GitHub issue number embedded in a Gitea issue body."""
+    m = re.search(r"<!-- GitHub: #(\d+) -->", body or "")
+    return int(m.group(1)) if m else None
+
+
+def bridge_github_to_gitea():
+    """
+    Poll GitHub for issues labelled 'dispatch/local' and mirror them into local Gitea
+    as 'dispatch/github' issues.  The opened event will then trigger spark.py to
+    process them; results get cross-posted back to the GitHub issue.
+    """
+    if not GITEA_TOKEN:
+        return
+
+    owner, repo_name = (GITEA_REPO + "/").split("/")[:2]
+
+    # Find GitHub issue numbers already mirrored locally
+    existing = gitea_api(
+        "GET", f"/repos/{owner}/{repo_name}/issues?state=open&type=issues&limit=50"
+    ) or []
+    mirrored = {extract_github_issue_number(i.get("body", "")) for i in existing} - {None}
+
+    try:
+        r = gh_run(
+            "issue", "list",
+            "--repo", REPO,
+            "--label", "dispatch/local",
+            "--state", "open",
+            "--json", "number,title,body,labels",
+            "--limit", "20",
+        )
+        gh_issues = json.loads(r.stdout)
+    except Exception as e:
+        log.warning(f"Bridge: GitHub fetch failed: {e}")
+        return
+
+    # Get the dispatch/github label id once
+    labels_list = gitea_api("GET", f"/repos/{owner}/{repo_name}/labels?limit=50") or []
+    dg_label_id = next((l["id"] for l in labels_list if l["name"] == "dispatch/github"), None)
+
+    for gh_issue in gh_issues:
+        gh_num = gh_issue["number"]
+        if gh_num in mirrored:
+            continue
+
+        title = f"[GitHub #{gh_num}] {gh_issue['title']}"
+        body = (
+            f"{gh_issue.get('body', '') or ''}\n\n"
+            f"---\n"
+            f"*Bridged from [Copilotclaw/copilotclaw#{gh_num}]"
+            f"(https://github.com/{REPO}/issues/{gh_num})*\n"
+            f"<!-- GitHub: #{gh_num} -->"
+        )
+
+        new_issue = gitea_api(
+            "POST", f"/repos/{owner}/{repo_name}/issues",
+            {"title": title, "body": body, "labels": [dg_label_id] if dg_label_id else []},
+        )
+        if new_issue:
+            log.info(f"🌉 Bridged GitHub #{gh_num} → Gitea #{new_issue['number']}: {gh_issue['title'][:50]}")
 
 
 # ─── Unified processing ───────────────────────────────────────────────────────
@@ -402,7 +509,25 @@ def post_result(issue: dict, result: str, status: str):
 
     if source == "gitea":
         gitea_comment(number, body)
-        gitea_remove_label(number, next(l for l in WATCH_LABELS if l in {lbl["name"] for lbl in issue.get("labels", [])}))
+
+        # Cross-post back to GitHub if this is a bridged issue
+        label_names = {l["name"] for l in issue.get("labels", [])}
+        if "dispatch/github" in label_names:
+            gh_num = extract_github_issue_number(issue.get("body", ""))
+            if gh_num:
+                try:
+                    github_comment(
+                        gh_num,
+                        f"⚡ **Spark (local) response** via node `{NODE}`:\n\n{result}"
+                    )
+                    log.info(f"↩️  Cross-posted result to GitHub #{gh_num}")
+                except Exception as e:
+                    log.warning(f"Failed to cross-post to GitHub #{gh_num}: {e}")
+
+        # Remove the watch label if present (doesn't matter if none found)
+        for label in WATCH_LABELS:
+            if label in label_names:
+                gitea_remove_label(number, label)
     else:
         try:
             github_comment(number, body)
@@ -433,10 +558,16 @@ def process_issue(issue: dict):
 
 
 def process_all():
-    """One poll cycle — fetch from all sources and process."""
+    """One poll cycle — bridge GitHub→Gitea, then fetch from all sources and process."""
     tasks = []
 
-    # GitHub
+    # Bridge: mirror GitHub dispatch/local issues into local Gitea
+    try:
+        bridge_github_to_gitea()
+    except Exception as e:
+        log.warning(f"Bridge error: {e}")
+
+    # GitHub — fetch any unclaimed issues with watch labels
     try:
         gh_tasks = github_fetch_tasks()
         tasks.extend(gh_tasks)
@@ -445,7 +576,7 @@ def process_all():
     except Exception as e:
         log.warning(f"GitHub fetch error: {e}")
 
-    # Gitea (optional)
+    # Gitea — fetch any unclaimed labeled issues (fallback for missed webhooks)
     try:
         gitea_tasks = gitea_fetch_tasks()
         tasks.extend(gitea_tasks)
@@ -477,7 +608,7 @@ def check_gh_auth() -> bool:
 
 def post_heartbeat():
     """Post a liveness heartbeat comment to the designated GitHub issue."""
-    issue_num = os.getenv("SPARK_HEARTBEAT_ISSUE", "90")
+    issue_num = os.getenv("SPARK_HEARTBEAT_ISSUE", "")
     if not issue_num:
         log.info("SPARK_HEARTBEAT_ISSUE not set — skipping heartbeat")
         return
@@ -500,6 +631,8 @@ def main():
     parser = argparse.ArgumentParser(description="Spark ⚡ local AI agent runner")
     parser.add_argument("--daemon", action="store_true", help="Run as poll daemon")
     parser.add_argument("--issue", type=int, help="Process a specific GitHub issue number")
+    parser.add_argument("--gitea-issue", type=int, dest="gitea_issue",
+                        help="Process a specific Gitea issue number (triggered by issue label event)")
     parser.add_argument("--detect", action="store_true", help="Detect available agents and exit")
     parser.add_argument("--heartbeat", action="store_true", help="Post liveness heartbeat to SPARK_HEARTBEAT_ISSUE")
     args = parser.parse_args()
@@ -518,16 +651,38 @@ def main():
         post_heartbeat()
         return
 
-    # Bootstrap labels
+    # Bootstrap labels (best-effort — failures are non-fatal)
     try:
         ensure_github_label("spark/ready", "fbca04", "Spark: task ready for local agent")
         ensure_github_label("spark/claimed", "0075ca", "Spark: task claimed by a node")
         ensure_github_label("spark/update", "e4e669", "Spark: self-update instruction")
     except Exception:
         pass
+    try:
+        ensure_gitea_labels()
+    except Exception:
+        pass
+
+    if args.gitea_issue:
+        # Direct Gitea issue trigger (from issues: opened / labeled workflow event).
+        # Process ANY unclaimed issue — no label required. Labels are only used to
+        # decide whether to cross-post back to GitHub (dispatch/github) or self-update.
+        if not GITEA_TOKEN:
+            log.error("GITEA_TOKEN is required for --gitea-issue mode")
+            sys.exit(1)
+        issue = gitea_fetch_issue(args.gitea_issue)
+        if not issue:
+            log.error(f"Gitea issue #{args.gitea_issue} not found or is a PR")
+            sys.exit(1)
+        label_names = {l["name"] for l in issue.get("labels", [])}
+        if CLAIMED_LABEL in label_names:
+            log.info(f"Gitea issue #{args.gitea_issue} already claimed — skipping")
+            return
+        process_issue(issue)
+        return
 
     if args.issue:
-        # Single-issue mode (for Gitea Actions)
+        # Single GitHub issue mode
         try:
             r = gh_run(
                 "issue", "view", str(args.issue),
@@ -545,9 +700,8 @@ def main():
         return
 
     if args.daemon:
-        log.info(f"🔄 Daemon mode | poll={POLL_INTERVAL}s | heartbeat={HEARTBEAT_INTERVAL//60}m")
+        log.info(f"🔄 Daemon mode | poll={POLL_INTERVAL}s")
         check_gh_auth()
-        last_heartbeat = 0.0
         while True:
             try:
                 n = process_all()
@@ -558,10 +712,6 @@ def main():
                 break
             except Exception as e:
                 log.error(f"Poll error: {e}", exc_info=True)
-            now = time.monotonic()
-            if now - last_heartbeat >= HEARTBEAT_INTERVAL:
-                post_heartbeat()
-                last_heartbeat = now
             time.sleep(POLL_INTERVAL)
     else:
         # One-shot mode (cron / CI)
