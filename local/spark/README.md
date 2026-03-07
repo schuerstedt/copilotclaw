@@ -8,7 +8,9 @@ The minimal self-evolving local AI agent. Plant it on any machine. Watch it work
 GitHub Issues ──┐
                 ├──► spark.py ──► AI Agent ──► Post result back
 Gitea Issues ───┘         │
-                          └──► spark/update: rewrites itself
+                          ├──► spark/update: rewrites itself
+                          ├──► --monitor: checks Crunch + self
+                          └──► --remember/--recall: Cosmos DB memory
 ```
 
 ## Quick Start
@@ -21,9 +23,9 @@ bash local/spark/install.sh
 gh auth login
 
 # Test run:
-source ~/spark/.env && python3 ~/spark/spark.py
+source ~/spark/.env && python3 ~/spark/spark.py --detect
 
-# Daemon mode:
+# Daemon mode (polls + heartbeat every 30m):
 python3 ~/spark/spark.py --daemon
 ```
 
@@ -44,6 +46,35 @@ python3 ~/spark/spark.py --daemon
 | `qwen-code` | `npm i -g qwen-code` |
 | `ollama` | `curl https://ollama.ai/install.sh \| sh` |
 
+## Skills
+
+Skills live in `~/spark/skills/<name>/`. Each has `SKILL.md` (docs) + `run.sh` (runner).
+
+| Skill | Purpose |
+|-------|---------|
+| `azure` | Call Azure AI Foundry LLM (Grok, GPT, Claude) |
+| `memory` | Read/write Cosmos DB shared brain |
+| `heartbeat` | Post liveness ping to GitHub #90 |
+
+## Memory (Cosmos DB)
+
+Spark shares a persistent brain with Crunch:
+
+```bash
+python3 spark.py --remember "Spark runs on macserver with claude+gemini"
+python3 spark.py --recall "macserver"
+```
+
+Requires `COSMOS_ENDPOINT` + `COSMOS_KEY` in `~/spark/.env`.
+
+## Monitoring
+
+```bash
+python3 spark.py --monitor  # check Crunch CI + own heartbeat
+```
+
+Posts alert to #11 if something looks wrong.
+
 ## Self-update
 
 Create an issue with label `spark/update`. The body can be:
@@ -55,9 +86,12 @@ Create an issue with label `spark/update`. The body can be:
 Copy `.gitea/workflows/spark.yml` to your Gitea repo. With `act_runner` connected,
 Spark runs as a Gitea Actions job triggered by issue labels — no polling needed.
 
+The workflow includes:
+- ✅ Single concurrency group (no more double posting)
+- ✅ Heartbeat on every scheduled run
+- ✅ COSMOS + AZURE env vars wired in
+
 ## Scale
 
 Each machine runs its own Spark instance. They all watch the same issue queue.
-First to claim an issue wins (`spark/claimed` label). 
-
-Add a `SPARK_NODE` env var so results show which machine did the work.
+First to claim wins (`spark/claimed`). Double-post guard is built in.

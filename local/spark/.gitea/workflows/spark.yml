@@ -10,9 +10,9 @@ on:
   schedule:
     - cron: "*/2 * * * *"  # poll GitHub every 2 min for spark/ready issues
 
-# One job per issue, same issue serialized
+# One job at a time across all triggers — prevents parallel runs claiming the same issue
 concurrency:
-  group: "spark-issue-${{ github.event.issue.number || 'push' }}"
+  group: "spark-agent"
   cancel-in-progress: false
 
 jobs:
@@ -32,16 +32,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           SPARK_REPO: ${{ vars.SPARK_REPO || 'Copilotclaw/copilotclaw' }}
-          SPARK_NODE: ${{ vars.SPARK_NODE || runner.name }}
+          SPARK_NODE: ${{ vars.SPARK_NODE || 'macserver' }}
+          SPARK_HEARTBEAT_ISSUE: "90"
           GITEA_URL: ${{ vars.GITEA_URL || 'http://localhost:3000' }}
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           GITEA_REPO: ${{ vars.GITEA_REPO || '' }}
-          # No API keys needed — claude is locally authenticated via CLI
+          COSMOS_ENDPOINT: ${{ secrets.COSMOS_ENDPOINT }}
+          COSMOS_KEY: ${{ secrets.COSMOS_KEY }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_APIKEY: ${{ secrets.AZURE_APIKEY }}
         run: |
-          # Single-issue mode: process just this issue
           ISSUE_NUM="${{ github.event.issue.number }}"
           if [ -n "$ISSUE_NUM" ]; then
+            # Label-triggered: process this specific issue
             python3 local/spark/spark.py --issue "$ISSUE_NUM"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            # Scheduled: process any pending tasks + post heartbeat
+            python3 local/spark/spark.py
+            python3 local/spark/spark.py --heartbeat
           else
             # Push to spark/ = process all pending
             python3 local/spark/spark.py
@@ -50,3 +58,4 @@ jobs:
       - name: Show log tail
         if: always()
         run: tail -20 ~/spark/logs/spark.log 2>/dev/null || echo "(no log yet)"
+

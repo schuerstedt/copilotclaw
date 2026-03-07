@@ -10,6 +10,11 @@ Usage:
   python3 spark.py                  # run once (cron/CI mode)
   python3 spark.py --daemon         # run forever (poll loop)
   python3 spark.py --issue 42       # process a specific issue
+  python3 spark.py --heartbeat      # post liveness heartbeat
+  python3 spark.py --detect         # detect available agents
+  python3 spark.py --monitor        # check health of Crunch + self
+  python3 spark.py --remember "fact" [--type memory]  # store to Cosmos DB
+  python3 spark.py --recall "query"                   # search Cosmos DB
 
 Environment:
   SPARK_REPO          GitHub repo  (default: Copilotclaw/copilotclaw)
@@ -23,6 +28,11 @@ Environment:
   GITEA_TOKEN         Gitea API token
   GITEA_REPO          Gitea repo owner/name (default: same as SPARK_REPO)
   GH_TOKEN            GitHub PAT for gh CLI (optional — gh auth login works too)
+  COSMOS_ENDPOINT     Azure Cosmos DB endpoint for memory
+  COSMOS_KEY          Azure Cosmos DB master key
+  AZURE_ENDPOINT      Azure AI Foundry base URL (for skills)
+  AZURE_APIKEY        Azure AI Foundry API key (for skills)
+  CRUNCH_MONITOR_ISSUE  GitHub issue # to post alerts to (default: 11)
 """
 
 import json
@@ -39,7 +49,7 @@ from pathlib import Path
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-NODE = os.getenv("SPARK_NODE", socket.gethostname())
+NODE = os.getenv("SPARK_NODE", "").strip() or socket.gethostname()  # empty string fallback → hostname
 REPO = os.getenv("SPARK_REPO", "Copilotclaw/copilotclaw")
 WATCH_LABELS = [l.strip() for l in os.getenv("SPARK_LABELS", "spark/ready,dispatch/local").split(",")]
 CLAIMED_LABEL = os.getenv("SPARK_CLAIMED_LABEL", "spark/claimed")
@@ -50,6 +60,19 @@ IDENTITY_FILE = os.getenv("SPARK_IDENTITY_FILE", str(Path(__file__).parent / "SP
 GITEA_URL = os.getenv("GITEA_URL", "http://localhost:3000").rstrip("/")
 GITEA_TOKEN = os.getenv("GITEA_TOKEN", "")
 GITEA_REPO = os.getenv("GITEA_REPO", REPO)
+
+# Cosmos DB memory
+COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "").rstrip("/")
+COSMOS_KEY = os.getenv("COSMOS_KEY", "")
+COSMOS_DB = "crunch"
+COSMOS_CONTAINER = "memories"
+
+# Azure AI Foundry (for skills)
+AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT", "")
+AZURE_APIKEY = os.getenv("AZURE_APIKEY", "")
+
+# Monitoring
+MONITOR_ISSUE = int(os.getenv("CRUNCH_MONITOR_ISSUE", "11"))
 
 # Agent priority order — first one found wins
 AGENT_PRIORITY = ["claude", "gemini", "codex", "opencode", "qwen-code"]
@@ -482,18 +505,44 @@ def bridge_github_to_gitea():
 
 # ─── Unified processing ───────────────────────────────────────────────────────
 
-def claim(issue: dict):
+def claim(issue: dict) -> bool:
+    """
+    Claim an issue. Returns True if this node successfully claimed it,
+    False if another process already claimed it (double-post guard).
+    """
     source = issue.get("_source", "github")
     number = issue["number"]
+
     if source == "gitea":
         gitea_add_label(number, CLAIMED_LABEL)
         gitea_comment(number, f"⚡ **Spark claimed** (node: `{NODE}`). Working...")
+        return True
     else:
         github_add_label(number, CLAIMED_LABEL)
+        # Re-fetch the issue briefly after to detect a race: if the label was
+        # already present before we added it, another node beat us to it.
+        time.sleep(1)
+        try:
+            r = gh_run(
+                "issue", "view", str(number), "--repo", REPO,
+                "--json", "labels,comments",
+            )
+            fresh = json.loads(r.stdout)
+            # Count how many "Spark claimed" comments already exist
+            existing_claims = [
+                c for c in fresh.get("comments", [])
+                if "Spark claimed" in c.get("body", "")
+            ]
+            if existing_claims:
+                log.warning(f"⚠️  #{number} already has a claim comment — another node beat us, skipping")
+                return False
+        except Exception:
+            pass  # If re-fetch fails, proceed cautiously
         try:
             github_comment(number, f"⚡ **Spark claimed** (node: `{NODE}`). Working...")
         except Exception:
             pass
+        return True
 
 
 def post_result(issue: dict, result: str, status: str):
@@ -543,9 +592,17 @@ def process_issue(issue: dict):
     label_names = {l["name"] for l in issue.get("labels", [])}
     source = issue.get("_source", "github")
 
+    # Guard: skip if already claimed (handles race between schedule + issue-labeled triggers)
+    if CLAIMED_LABEL in label_names:
+        log.info(f"⏭️  #{number} already claimed — skipping")
+        return
+
     log.info(f"⚡ [{source}] #{number}: {title[:70]}")
 
-    claim(issue)
+    claimed = claim(issue)
+    if not claimed:
+        log.info(f"⏭️  #{number} claim lost to another node — skipping")
+        return
 
     # Self-update special case
     if "spark/update" in label_names:
@@ -625,6 +682,238 @@ def post_heartbeat():
         log.error(f"Heartbeat failed: {e}")
 
 
+# ─── Cosmos DB Memory ─────────────────────────────────────────────────────────
+
+def _cosmos_auth(verb: str, resource_type: str, resource_link: str, date: str) -> str:
+    import hashlib, hmac, base64, urllib.parse
+    text = f"{verb.lower()}\n{resource_type.lower()}\n{resource_link}\n{date.lower()}\n\n"
+    key_bytes = base64.b64decode(COSMOS_KEY)
+    sig = base64.b64encode(
+        hmac.new(key_bytes, text.encode("utf-8"), hashlib.sha256).digest()
+    ).decode()
+    return urllib.parse.quote(f"type=master&ver=1.0&sig={sig}")
+
+
+def _cosmos_request(method: str, path: str, body=None, resource_type: str = "",
+                    resource_link: str = "", partition_key: str = None):
+    import urllib.request, urllib.error, urllib.parse
+    from email.utils import formatdate
+    date = formatdate(usegmt=True)
+    auth = _cosmos_auth(method, resource_type, resource_link, date)
+    url = f"{COSMOS_ENDPOINT}{path}"
+    headers = {
+        "Authorization": auth,
+        "x-ms-date": date,
+        "x-ms-version": "2018-12-31",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if partition_key is not None:
+        headers["x-ms-documentdb-partitionkey"] = json.dumps([partition_key])
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode()
+        raise RuntimeError(f"Cosmos {e.code}: {err[:200]}") from e
+
+
+def spark_remember(content: str, doc_type: str = "memory", tags: list = None) -> str:
+    """
+    Write a memory to Cosmos DB.
+    Returns the document ID on success, or error message.
+    """
+    if not COSMOS_ENDPOINT or not COSMOS_KEY:
+        log.warning("⚠️  COSMOS_ENDPOINT / COSMOS_KEY not set — memory not persisted")
+        return "no-cosmos"
+    import uuid
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    doc_id = f"spark-{doc_type}-{ts}-{uuid.uuid4().hex[:6]}"
+    doc = {
+        "id": doc_id,
+        "type": doc_type,
+        "content": content,
+        "tags": tags or [],
+        "source": f"spark/{NODE}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    coll_link = f"dbs/{COSMOS_DB}/colls/{COSMOS_CONTAINER}"
+    try:
+        _cosmos_request(
+            "POST", f"/{coll_link}/docs",
+            body=doc, resource_type="docs",
+            resource_link=coll_link, partition_key=doc_type,
+        )
+        log.info(f"🧠 Memory written: {doc_id}")
+        return doc_id
+    except Exception as e:
+        log.error(f"Memory write failed: {e}")
+        return f"error: {e}"
+
+
+def spark_recall(query: str = "", doc_type: str = None, limit: int = 5) -> list[dict]:
+    """
+    Recall recent memories from Cosmos DB.
+    Returns list of matching documents.
+    """
+    if not COSMOS_ENDPOINT or not COSMOS_KEY:
+        return []
+    import urllib.request, urllib.error
+    coll_link = f"dbs/{COSMOS_DB}/colls/{COSMOS_CONTAINER}"
+    if doc_type:
+        sql = f"SELECT TOP {limit} * FROM c WHERE c.type='{doc_type}' ORDER BY c._ts DESC"
+    elif query:
+        safe_q = query.replace("'", "''")
+        sql = f"SELECT TOP {limit} * FROM c WHERE CONTAINS(c.content, '{safe_q}') ORDER BY c._ts DESC"
+    else:
+        sql = f"SELECT TOP {limit} * FROM c ORDER BY c._ts DESC"
+
+    date_str = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    auth = _cosmos_auth("POST", "docs", coll_link, date_str)
+    url = f"{COSMOS_ENDPOINT}/{coll_link}/docs"
+    headers = {
+        "Authorization": auth,
+        "x-ms-date": date_str,
+        "x-ms-version": "2018-12-31",
+        "Content-Type": "application/query+json",
+        "Accept": "application/json",
+        "x-ms-documentdb-isquery": "true",
+        "x-ms-max-item-count": str(limit),
+        "x-ms-documentdb-query-enablecrosspartition": "true",
+    }
+    data = json.dumps({"query": sql, "parameters": []}).encode()
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read()).get("Documents", [])
+    except Exception as e:
+        log.error(f"Memory recall failed: {e}")
+        return []
+
+
+# ─── Azure AI Foundry (skills LLM) ───────────────────────────────────────────
+
+def azure_llm(prompt: str, model: str = "grok-4-1-fast-non-reasoning", max_tokens: int = 2000) -> str:
+    """
+    Call Azure AI Foundry for LLM tasks (summarisation, analysis, generation).
+    Falls back gracefully if not configured.
+    """
+    if not AZURE_ENDPOINT or not AZURE_APIKEY:
+        return "(Azure AI not configured — set AZURE_ENDPOINT and AZURE_APIKEY)"
+    import urllib.request, urllib.error
+    url = f"{AZURE_ENDPOINT}/chat/completions?api-version=2024-05-01-preview"
+    body = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }).encode()
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": AZURE_APIKEY,
+    }
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        log.error(f"Azure LLM failed: {e}")
+        return f"(Azure LLM error: {e})"
+
+
+# ─── Monitoring ───────────────────────────────────────────────────────────────
+
+def run_monitor() -> str:
+    """
+    Check health of Crunch (CI runs) and Spark (own heartbeat freshness).
+    Returns a status report string. Posts alert to MONITOR_ISSUE if something is wrong.
+    """
+    issues = []
+    report_lines = [f"⚡ **Spark monitor** | node: `{NODE}` | {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"]
+    report_lines.append("")
+
+    # 1. Check Crunch's last CI run
+    try:
+        r = gh_run(
+            "run", "list", "--repo", REPO,
+            "--limit", "3",
+            "--json", "status,conclusion,startedAt,name,databaseId",
+        )
+        runs = json.loads(r.stdout)
+        report_lines.append("**Crunch CI (last 3 runs):**")
+        for run in runs:
+            status = run.get("conclusion") or run.get("status", "?")
+            icon = "✅" if status == "success" else ("⚠️" if status == "failure" else "🔄")
+            started = run.get("startedAt", "?")[:16]
+            report_lines.append(f"  {icon} `{run.get('name', '?')}` — {status} @ {started}")
+            if status == "failure":
+                issues.append(f"Crunch CI failure: {run.get('name')}")
+    except Exception as e:
+        report_lines.append(f"  ⚠️ Could not check CI: {e}")
+        issues.append(f"CI check failed: {e}")
+
+    report_lines.append("")
+
+    # 2. Check own heartbeat freshness (issue #90 last comment)
+    hb_issue = int(os.getenv("SPARK_HEARTBEAT_ISSUE", "90"))
+    try:
+        r = gh_run(
+            "issue", "view", str(hb_issue), "--repo", REPO,
+            "--json", "comments",
+        )
+        data = json.loads(r.stdout)
+        comments = data.get("comments", [])
+        # Find last spark heartbeat comment
+        hb_comments = [c for c in comments if "Spark alive" in c.get("body", "")]
+        if hb_comments:
+            last_hb = hb_comments[-1]
+            last_ts = last_hb.get("createdAt", "")
+            if last_ts:
+                from datetime import timedelta
+                try:
+                    last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
+                    age_min = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
+                    if age_min > 70:
+                        issues.append(f"Spark heartbeat stale: {age_min:.0f}m ago")
+                        report_lines.append(f"**Heartbeat:** ⚠️ last beat {age_min:.0f}m ago (threshold 70m)")
+                    else:
+                        report_lines.append(f"**Heartbeat:** ✅ {age_min:.0f}m ago")
+                except Exception:
+                    report_lines.append(f"**Heartbeat:** last @ {last_ts}")
+            else:
+                report_lines.append("**Heartbeat:** last comment found but no timestamp")
+        else:
+            report_lines.append(f"**Heartbeat:** ⚠️ No heartbeat comments on #{hb_issue} yet")
+            issues.append(f"No heartbeat on #{hb_issue}")
+    except Exception as e:
+        report_lines.append(f"**Heartbeat:** ⚠️ check failed: {e}")
+        issues.append(f"Heartbeat check failed: {e}")
+
+    report_lines.append("")
+
+    # 3. Agent availability
+    agent = detect_agent()
+    report_lines.append(f"**Local agent:** {agent or '❌ none detected'}")
+
+    report = "\n".join(report_lines)
+
+    # Post alert if issues found
+    if issues:
+        alert = "🚨 **Spark monitor alert**\n\n" + "\n".join(f"- {i}" for i in issues)
+        alert += f"\n\nNode: `{NODE}` | {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        try:
+            github_comment(MONITOR_ISSUE, alert)
+            log.warning(f"🚨 Monitor alert posted to #{MONITOR_ISSUE}: {issues}")
+        except Exception as e:
+            log.error(f"Failed to post monitor alert: {e}")
+    else:
+        log.info("✅ Monitor: all systems healthy")
+
+    return report
+
+
 def main():
     import argparse
 
@@ -635,6 +924,10 @@ def main():
                         help="Process a specific Gitea issue number (triggered by issue label event)")
     parser.add_argument("--detect", action="store_true", help="Detect available agents and exit")
     parser.add_argument("--heartbeat", action="store_true", help="Post liveness heartbeat to SPARK_HEARTBEAT_ISSUE")
+    parser.add_argument("--monitor", action="store_true", help="Check health of Crunch CI + own heartbeat, post alert if unhealthy")
+    parser.add_argument("--remember", metavar="FACT", help="Store a fact in Cosmos DB memory")
+    parser.add_argument("--recall", metavar="QUERY", help="Recall recent memories from Cosmos DB")
+    parser.add_argument("--memory-type", default="memory", help="Memory type/partition for --remember (default: memory)")
     args = parser.parse_args()
 
     log.info(f"⚡ Spark starting | node={NODE} | repo={REPO}")
@@ -644,11 +937,33 @@ def main():
         print(f"Agent: {agent or 'none found'}")
         print(f"Watched labels: {WATCH_LABELS}")
         print(f"Gitea: {'configured' if GITEA_TOKEN else 'not configured'}")
+        print(f"Memory: {'configured' if COSMOS_ENDPOINT and COSMOS_KEY else 'not configured'}")
+        print(f"Azure AI: {'configured' if AZURE_ENDPOINT and AZURE_APIKEY else 'not configured'}")
         return
 
     if args.heartbeat:
         check_gh_auth()
         post_heartbeat()
+        return
+
+    if args.monitor:
+        check_gh_auth()
+        report = run_monitor()
+        print(report)
+        return
+
+    if args.remember:
+        doc_id = spark_remember(args.remember, doc_type=args.memory_type)
+        print(f"✅ Stored memory: {doc_id}")
+        return
+
+    if args.recall:
+        docs = spark_recall(query=args.recall)
+        if not docs:
+            print("No memories found")
+        for d in docs:
+            ts = d.get("created_at", "?")[:19]
+            print(f"[{ts}] ({d.get('type', '?')}) {str(d.get('content', ''))[:200]}")
         return
 
     # Bootstrap labels (best-effort — failures are non-fatal)
@@ -693,6 +1008,9 @@ def main():
             label_names = {l["name"] for l in issue.get("labels", [])}
             if not (label_names & set(WATCH_LABELS)):
                 log.info(f"Issue #{args.issue} has no watched labels — skipping")
+                return
+            if CLAIMED_LABEL in label_names:
+                log.info(f"Issue #{args.issue} already claimed — skipping (double-post guard)")
                 return
             process_issue(issue)
         except Exception as e:
