@@ -152,3 +152,6 @@ SHIPPED: .github/scripts/lib/ — platform.py + 4 scripts. Works on GitHub+Gitea
 [2026-03-07T08:46:33Z] HOOK:ToolFailure tool=bash result=failure msg=Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation, indirect expansion, or nested command substitution) that could enable arbitrary code execution. Please rew
 [2026-03-07T08:46Z] MCP TOOLSETS: targeted toolsets added to heartbeat+agent workflows. Less context, better focus for cheap models. issues+repos+actions+labels (heartbeat), +pull_requests+search (agent).
 [2026-03-07T08:46:43Z] HOOK:SessionEnd reason=complete
+[2026-03-07T08:59:06Z] HOOK:SessionStart source=new
+[2026-03-07T09:00:59Z] HOOK:ToolFailure tool=bash result=failure msg=Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation, indirect expansion, or nested command substitution) that could enable arbitrary code execution. Please rew
+[2026-03-07 09:00] Heartbeat: closed #14 (autonomous pickup done), researched Gitea for #80 (75% compat, platform.py is the key), spawned #82 (migrate scripts to platform.py). Quota 107/300 (35%).
