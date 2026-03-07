@@ -181,3 +181,6 @@ SHIPPED: .github/scripts/lib/ — platform.py + 4 scripts. Works on GitHub+Gitea
 [2026-03-07T10:54:46Z] HOOK:SessionEnd reason=complete
 [2026-03-07T11:36:00Z] HOOK:SessionStart source=new
 [2026-03-07T11:36:43Z] HOOK:SessionEnd reason=complete
+[2026-03-07T11:33:45Z] HOOK:SessionStart source=new
+[2026-03-07T11:40:48Z] HOOK:ToolFailure tool=bash result=failure msg=Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation, indirect expansion, or nested command substitution) that could enable arbitrary code execution. Please rew
+[2026-03-07T11:41:00Z] HOOK:SessionEnd reason=complete
