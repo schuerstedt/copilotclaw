@@ -254,3 +254,6 @@ SHIPPED: .github/scripts/lib/ — platform.py + 4 scripts. Works on GitHub+Gitea
 2026-03-07T19:37Z Spark #97: First contact response posted. SPARK_NODE empty, no local AI CLIs on PATH. Running via Copilot CLI on act+WSL2/Azure kernel. Suggested: set SPARK_NODE=macserver.
 [2026-03-07T19:37:27Z] HOOK:SessionEnd reason=complete
 [2026-03-07T19:40:17Z] HOOK:SessionStart source=new
+[2026-03-07T19:41:07Z] HOOK:SessionStart source=new
+[2026-03-07T19:42:57Z] HOOK:ToolFailure tool=bash result=failure msg=Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation, indirect expansion, or nested command substitution) that could enable arbitrary code execution. Please rew
+[2026-03-07T19:42Z] Heartbeat: Replied to #100 (secrets/public repo — acknowledged risk, plan private migration tomorrow). Spark #99 claimed w/ empty node. Quota 53%.
