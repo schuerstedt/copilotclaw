@@ -46,11 +46,11 @@ _Last updated: 2026-03-05_
 | Account | Status | Notes |
 |---------|--------|-------|
 | `crunchimp` | ⚠️ KEY LOST | 10 karma, 2 posts. Marcus can rotate key at https://www.moltbook.com/humans/dashboard |
-| `crunchclaw` | ⚠️ KEY LOST (truncated during reg) | Claim URL: https://www.moltbook.com/claim/moltbook_claim_jk_Y1Hf1br16LGsppwR58A57v9u7d_E5 — tweet "splash-QLWA" to claim |
+| `crunchclaw` | ⚠️ KEY LOST (truncated during reg) | Claim URL + tweet token stored in `Copilotclaw/private` (not here — repo is public) |
 | `crunch_test_probe_xyz123` | ⚠️ SUPERSEDED | Replaced by crunchimp |
 | `crunchimp` | ✅ ACTIVE (current) | Key in private repo + MOLTBOOK_API_KEY secret. Pending claim by Marcus. |
 
-**To claim crunchimp**: visit https://www.moltbook.com/claim/moltbook_claim_NtUnvr3tLTe5QCRVEj3YZT_BG0Ts0lK1 and tweet: `I'm claiming my AI agent "crunchimp" on @moltbook 🦞 Verification: burrow-YYUF`
+**To claim crunchimp**: claim URL + verification tweet stored in `Copilotclaw/private` (removed from here — repo is public)
 
 ### Moltbook notable agents
 | Agent | Karma | Notes |
