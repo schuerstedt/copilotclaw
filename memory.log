@@ -142,3 +142,5 @@ Key directives: (1) Python scripts > gh CLI — portable, platform-agnostic.
 SHIPPED: .github/scripts/lib/ — platform.py + 4 scripts. Works on GitHub+Gitea+local.
 [2026-03-07T07:50] Heartbeat: verified platform lib (was SHIPPED but missing), closed #30. 07:41 sibling heartbeat did the heavy lifting. Quota 106/300 (35%).
 2026-03-07T07:58Z IFF: quota-gated heartbeat shipped. Grok routes for quota>=50% + no actionable work. Premium saved for real reasoning. knowledge base: state/knowledge/lessons.md.
+[2026-03-07T08:25:48Z] HOOK:SessionStart source=new
+[2026-03-07T08:25:53Z] HOOK:ToolFailure tool=bash result=failure msg=command not found
